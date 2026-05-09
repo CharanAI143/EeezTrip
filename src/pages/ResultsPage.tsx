@@ -220,7 +220,7 @@ function CostChart({ breakdown, total }: { breakdown: CostBreakdown; total: numb
                   {item.label}
                 </span>
                 <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, color: item.color, fontSize: '0.95rem' }}>
-                  ${item.value.toLocaleString()} <span style={{ color: '#a8d4ed', fontWeight: 500 }}>({pct}%)</span>
+                  ₹{item.value.toLocaleString('en-IN')} <span style={{ color: '#a8d4ed', fontWeight: 500 }}>({pct}%)</span>
                 </span>
               </div>
               <div style={{ height: 8, borderRadius: 4, background: 'rgba(0,0,0,0.05)', overflow: 'hidden' }}>
@@ -252,7 +252,7 @@ function CostChart({ breakdown, total }: { breakdown: CostBreakdown; total: numb
           background: 'linear-gradient(135deg, #0284c7, #ec4899)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         }}>
-          ${total.toLocaleString()}
+          ₹{total.toLocaleString('en-IN')}
         </span>
       </div>
     </div>

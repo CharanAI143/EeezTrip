@@ -42,10 +42,10 @@ const MOODS: MoodOption[] = [
 ];
 
 const BUDGET_PRESETS = [
-  { label: 'Budget', value: 600, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
-  { label: 'Mid-Range', value: 1500, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg> },
-  { label: 'Premium', value: 3000, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg> },
-  { label: 'Luxury', value: 6000, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg> },
+  { label: 'Budget', value: 20000, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
+  { label: 'Mid-Range', value: 50000, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg> },
+  { label: 'Premium', value: 100000, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg> },
+  { label: 'Luxury', value: 300000, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg> },
 ];
 
 const DAY_OPTIONS = [2, 3, 4, 5, 7, 10, 14];
@@ -58,6 +58,7 @@ export default function PreferencesPage() {
 
   const setMood = (mood: string) => dispatch({ type: 'SET_PREF', field: 'mood', value: mood });
   const setDays = (days: number) => dispatch({ type: 'SET_PREF', field: 'days', value: days });
+  const setMode = (mode: string) => dispatch({ type: 'SET_PREF', field: 'mode', value: mode });
   const setBudget = (val: number) => {
     dispatch({ type: 'SET_PREF', field: 'budget', value: val });
     setBudgetInput(String(val));
@@ -199,20 +200,20 @@ export default function PreferencesPage() {
                 borderRadius: 16, padding: '12px 20px',
                 boxShadow: '0 4px 12px rgba(14,165,233,0.08)',
               }}>
-                <span style={{ color: '#0ea5e9', fontWeight: 700, fontSize: '1.1rem' }}>$</span>
+                <span style={{ color: '#0ea5e9', fontWeight: 700, fontSize: '1.1rem' }}>₹</span>
                 <input
                   type="number"
                   value={budgetInput}
-                  min={200}
-                  max={50000}
+                  min={5000}
+                  max={2000000}
                   onChange={e => {
                     setBudgetInput(e.target.value);
                     const v = parseInt(e.target.value);
-                    if (!isNaN(v) && v >= 200) dispatch({ type: 'SET_PREF', field: 'budget', value: v });
+                    if (!isNaN(v) && v >= 5000) dispatch({ type: 'SET_PREF', field: 'budget', value: v });
                   }}
                   style={{
                     border: 'none', outline: 'none', background: 'transparent',
-                    width: 100, textAlign: 'right', fontFamily: 'Outfit, sans-serif',
+                    width: 140, textAlign: 'right', fontFamily: 'Outfit, sans-serif',
                     fontWeight: 900, fontSize: '1.4rem', color: '#0284c7',
                   }}
                 />
@@ -223,7 +224,7 @@ export default function PreferencesPage() {
             <div style={{ marginBottom: 32, position: 'relative' }}>
               <input
                 type="range"
-                min={200} max={10000} step={100}
+                min={5000} max={500000} step={1000}
                 value={prefs.budget}
                 onChange={e => setBudget(Number(e.target.value))}
                 style={{
@@ -233,8 +234,8 @@ export default function PreferencesPage() {
                 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-                <span style={{ color: '#5b8bad', fontSize: '0.85rem', fontWeight: 600 }}>$200</span>
-                <span style={{ color: '#5b8bad', fontSize: '0.85rem', fontWeight: 600 }}>$10,000+</span>
+                <span style={{ color: '#5b8bad', fontSize: '0.85rem', fontWeight: 600 }}>₹5,000</span>
+                <span style={{ color: '#5b8bad', fontSize: '0.85rem', fontWeight: 600 }}>₹5,00,000+</span>
               </div>
             </div>
 
@@ -259,7 +260,7 @@ export default function PreferencesPage() {
                   }}
                 >
                   <span style={{ color: prefs.budget === p.value ? '#0ea5e9' : '#a8d4ed' }}>{p.icon}</span>
-                  {p.label} (${p.value.toLocaleString()})
+                  {p.label} (₹{p.value.toLocaleString('en-IN')})
                 </button>
               ))}
             </div>
@@ -307,6 +308,49 @@ export default function PreferencesPage() {
                       {d === 1 ? 'DAY' : 'DAYS'}
                     </div>
                   </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Engine Mode ────────────────────────────────────────── */}
+          <div className="glass anim-fade-up delay-400" style={{ padding: '32px', marginBottom: 40, boxShadow: '0 8px 30px rgba(12, 27, 51, 0.04)' }}>
+            <h2 style={{
+              fontFamily: 'Outfit, sans-serif', fontWeight: 800,
+              fontSize: '1.25rem', color: '#0c1b33', marginBottom: 8,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: '#8b5cf6' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H7.5a2.25 2.25 0 00-2.25 2.25v10.5a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              Choose Generation Engine
+            </h2>
+            <p style={{ color: '#5b8bad', fontSize: '0.95rem', marginBottom: 24 }}>
+              Normal mode generates instantly. Deep mode uses an advanced local LLM (gpt-oss:120b) for better recommendations.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              {[
+                { id: 'normal', title: 'Lightning Mode', desc: 'Instant planning', color: '#0ea5e9' },
+                { id: 'deep', title: 'Deep AI Mode', desc: 'Powered by Ollama', color: '#8b5cf6' }
+              ].map(m => {
+                const active = prefs.mode === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => setMode(m.id)}
+                    style={{
+                      border: active ? `2px solid ${m.color}` : '1px solid rgba(0,0,0,0.06)',
+                      background: active ? `${m.color}0D` : '#fff',
+                      padding: 20, borderRadius: 16, cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.1rem', color: active ? m.color : '#0c1b33', marginBottom: 4 }}>
+                      {m.title}
+                    </div>
+                    <div style={{ color: '#5b8bad', fontSize: '0.85rem' }}>{m.desc}</div>
+                  </div>
                 );
               })}
             </div>

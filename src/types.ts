@@ -1,10 +1,21 @@
 // ─── Trip Request ────────────────────────────────────────────────────────────
 
 export type TripPreferences = {
+  origin: string;
   destination: string;
   mood: string;
   budget: number;
   days: number;
+  mode: 'normal' | 'deep';
+};
+
+export type TripRequest = {
+  origin: string;
+  destination: string;
+  mood: string;
+  budget: number;
+  days: number;
+  mode: 'normal' | 'deep';
 };
 
 // ─── API Response Types ──────────────────────────────────────────────────────

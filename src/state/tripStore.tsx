@@ -33,10 +33,12 @@ type Action =
 // ─── Initial State ────────────────────────────────────────────────────────────
 
 const initialPrefs: TripPreferences = {
+  origin: '',
   destination: '',
   mood: 'Relaxed',
-  budget: 1500,
+  budget: 50000,
   days: 5,
+  mode: 'normal',
 };
 
 const initialState: State = {

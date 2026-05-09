@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import List, Dict
 import sys
 import random
+import json
+import ollama
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,10 +26,12 @@ from get_images import get_place_images
 # ─── Request / Response Models ───────────────────────────────────────────────
 
 class TripRequest(BaseModel):
+    origin: str = ""
     destination: str = Field(min_length=2)
     mood: str = "Relaxed"
-    budget: int = 1200
+    budget: int = 50000
     days: int = 4
+    mode: str = "normal"
 
 
 class DayPlan(BaseModel):
@@ -339,8 +343,61 @@ def get_images(
     return images[:per_page]
 
 
+def ollama_generate_trip(req: TripRequest) -> TripResponse:
+    prompt = f"""You are an expert luxury travel planner. The user wants a {req.days}-day trip from {req.origin} to {req.destination}.
+Their mood/style is {req.mood} and their total budget is ₹{req.budget:,} INR.
+
+Generate a detailed, highly curated itinerary. 
+You MUST respond with a valid JSON object matching this schema perfectly:
+{{
+  "title": "string (Catchy title)",
+  "tagline": "string (Short evocative tagline)",
+  "summary": "string (A paragraph summarizing the trip, referencing origin, destination, mood, and budget)",
+  "best_time": "string (Best time of year to visit)",
+  "highlights": ["string", "string", "string"],
+  "daily_plan": [
+    {{
+      "day": 1,
+      "title": "string",
+      "morning": "string",
+      "afternoon": "string",
+      "evening": "string",
+      "tip": "string"
+    }}
+  ],
+  "cozy_tips": ["string", "string", "string"],
+  "must_try_food": ["string", "string", "string"],
+  "estimated_cost_breakdown": {{
+    "accommodation": integer,
+    "food": integer,
+    "transport": integer,
+    "activities": integer,
+    "misc": integer
+  }}
+}}
+
+Important rules:
+1. ONLY return the JSON object, absolutely no markdown formatting, no code blocks, no extra text.
+2. The values in estimated_cost_breakdown MUST sum up to exactly {req.budget} and MUST be integers (Indian Rupees).
+"""
+    try:
+        response = ollama.chat(
+            model='gpt-oss:120b-cloud',
+            messages=[{'role': 'user', 'content': prompt}],
+            format='json',
+        )
+        data = json.loads(response['message']['content'])
+        return TripResponse(**data)
+    except Exception as e:
+        print(f"Ollama generation failed: {e}")
+        raise HTTPException(status_code=500, detail="AI generation failed. Please ensure Ollama is running and gpt-oss:120b-cloud is pulled.")
+
+
 @app.post("/api/recommend", response_model=TripResponse)
 def recommend_trip(req: TripRequest):
+    if req.mode == "deep":
+        return ollama_generate_trip(req)
+
     destination = req.destination.strip()
     mood_key = req.mood.strip().lower()
     md = _mood_data(mood_key)
@@ -367,13 +424,14 @@ def recommend_trip(req: TripRequest):
 
     tips = random.sample(COZY_TIPS, k=min(4, len(COZY_TIPS)))
 
+    origin_text = f"from {req.origin} " if req.origin else ""
     return TripResponse(
         title=f"{req.mood} {destination} Escape",
         tagline=tagline,
         summary=(
-            f"A curated {days}-day {req.mood.lower()} journey through {destination}, "
+            f"A curated {days}-day {req.mood.lower()} journey {origin_text}to {destination}, "
             f"built around {md['vibe']}. "
-            f"Every detail is tailored to your ${req.budget:,} budget — "
+            f"Every detail is tailored to your ₹{req.budget:,} budget — "
             f"so you experience more and worry less."
         ),
         best_time="Spring (Mar–May) and autumn (Sep–Nov) for comfortable weather and fewer crowds.",
@@ -383,12 +441,3 @@ def recommend_trip(req: TripRequest):
         must_try_food=food_list,
         estimated_cost_breakdown=cost_breakdown,
     )
-
-
-@app.get("/api/images")
-def get_images(place: str = Query(...), per_page: int = Query(8)):
-    try:
-        images = get_place_images(place_name=place, per_page=per_page)
-        return images
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

@@ -6,12 +6,7 @@ export async function fetchRecommendation(prefs: TripPreferences): Promise<Recom
   const res = await fetch(`${BASE}/recommend`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      destination: prefs.destination,
-      mood: prefs.mood,
-      budget: prefs.budget,
-      days: prefs.days,
-    }),
+    body: JSON.stringify(prefs),
   });
 
   if (!res.ok) {

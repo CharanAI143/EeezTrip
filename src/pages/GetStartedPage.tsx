@@ -17,11 +17,12 @@ export default function GetStartedPage() {
   const { state, dispatch, navigate } = useTripStore();
   const [focused, setFocused] = useState(false);
 
+  const origin = state.preferences.origin;
   const destination = state.preferences.destination;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (destination.trim().length >= 2) navigate('preferences');
+    if (origin.trim().length >= 2 && destination.trim().length >= 2) navigate('preferences');
   };
 
   const selectDestination = (name: string) => {
@@ -101,34 +102,68 @@ export default function GetStartedPage() {
                 : '0 10px 30px rgba(12,27,51,0.05)',
               transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}>
-              <span style={{
-                paddingLeft: 28, display: 'flex', alignItems: 'center',
-                color: '#0ea5e9', flexShrink: 0,
-              }}>
-                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-              </span>
-              <input
-                id="destination-input"
-                type="text"
-                value={destination}
-                onChange={e => dispatch({ type: 'SET_DESTINATION', destination: e.target.value })}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                placeholder="e.g., Bali, Switzerland, Kyoto..."
-                required
-                minLength={2}
-                style={{
-                  flex: 1, border: 'none', outline: 'none', background: 'transparent',
-                  padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
-                  fontSize: '1.25rem', fontWeight: 500, color: '#0c1b33',
-                }}
-              />
+              {/* Origin Input */}
+              <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
+                <span style={{
+                  paddingLeft: 28, display: 'flex', alignItems: 'center',
+                  color: '#0ea5e9', flexShrink: 0,
+                }}>
+                  <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                </span>
+                <input
+                  id="origin-input"
+                  type="text"
+                  value={origin}
+                  onChange={e => dispatch({ type: 'SET_PREF', field: 'origin', value: e.target.value })}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  placeholder="Leaving from..."
+                  required
+                  minLength={2}
+                  style={{
+                    flex: 1, border: 'none', outline: 'none', background: 'transparent',
+                    padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
+                    fontSize: '1.15rem', fontWeight: 500, color: '#0c1b33',
+                  }}
+                />
+                <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
+              </div>
+
+              {/* Destination Input */}
+              <div style={{ display: 'flex', flex: 1 }}>
+                <span style={{
+                  paddingLeft: 20, display: 'flex', alignItems: 'center',
+                  color: '#ec4899', flexShrink: 0,
+                }}>
+                  <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                  </svg>
+                </span>
+                <input
+                  id="destination-input"
+                  type="text"
+                  value={destination}
+                  onChange={e => dispatch({ type: 'SET_PREF', field: 'destination', value: e.target.value })}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  placeholder="Where to?"
+                  required
+                  minLength={2}
+                  style={{
+                    flex: 1, border: 'none', outline: 'none', background: 'transparent',
+                    padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
+                    fontSize: '1.15rem', fontWeight: 500, color: '#0c1b33',
+                  }}
+                />
+              </div>
+
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={destination.trim().length < 2}
+                disabled={origin.trim().length < 2 || destination.trim().length < 2}
                 style={{
                   margin: 8, borderRadius: 999,
                   padding: '14px 36px',

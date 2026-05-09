@@ -122,30 +122,13 @@ def _wikimedia_build_photo(page: dict, query: str) -> dict | None:
         "source": "wikimedia",
     }
 
-def fetch_from_wikimedia(
-    query: str,
-    place_name: str = "",
-    per_page: int = 3,
-    exclude_ids: set[str] | None = None,
-    tags: list[str] | None = None,
-) -> list[dict]:
-    if exclude_ids is None:
-        exclude_ids = set()
-
-    search_parts = []
-    if place_name:
-        search_parts.append(f"intitle:{place_name}")
-    if tags:
-        search_parts.extend([tag.strip() for tag in tags if tag and isinstance(tag, str)])
-    search_parts.extend(["landscape", "scenic"])
-    search_query = " ".join(search_parts)
-
+def _do_wikimedia_query(search_query: str, per_page: int, exclude_ids: set[str]) -> list[dict]:
     params = {
         "action": "query",
         "generator": "search",
         "gsrsearch": search_query,
         "gsrnamespace": "6",
-        "gsrlimit": 20,
+        "gsrlimit": max(20, per_page * 2),
         "prop": "imageinfo",
         "iiprop": "url|dimensions|user",
         "iiurlwidth": 1280,
@@ -165,14 +148,59 @@ def fetch_from_wikimedia(
     seen_ids = set()
 
     for page in pages.values():
-        img = _wikimedia_build_photo(page, query)
+        img = _wikimedia_build_photo(page, search_query)
         if not img or img["image_id"] in exclude_ids or img["image_id"] in seen_ids:
             continue
+            
+        # Very loose validation
+        title_lower = img["alt"].lower()
+        if any(bad in title_lower for bad in ["map", "flag", "logo", "icon", "chart", "graph"]):
+            continue
+            
         images.append(img)
         seen_ids.add(img["image_id"])
         if len(images) >= per_page:
             break
     return images
+
+def fetch_from_wikimedia(
+    query: str,
+    place_name: str = "",
+    per_page: int = 3,
+    exclude_ids: set[str] | None = None,
+    tags: list[str] | None = None,
+) -> list[dict]:
+    if exclude_ids is None:
+        exclude_ids = set()
+
+    tag_str = " ".join([tag.strip() for tag in tags if tag and isinstance(tag, str)]) if tags else ""
+
+    queries_to_try = []
+    if place_name:
+        queries_to_try.append(f"intitle:{place_name} {tag_str} landscape scenic".strip())
+        queries_to_try.append(f"intitle:{place_name} {tag_str}".strip())
+        queries_to_try.append(f"{place_name} {tag_str} landscape".strip())
+        queries_to_try.append(f"{place_name}".strip())
+    else:
+        queries_to_try.append(f"{query} landscape scenic")
+        queries_to_try.append(query)
+
+    all_images = []
+    seen_ids = set(exclude_ids)
+
+    for search_query in queries_to_try:
+        if not search_query:
+            continue
+
+        new_images = _do_wikimedia_query(search_query, per_page - len(all_images), seen_ids)
+        for img in new_images:
+            all_images.append(img)
+            seen_ids.add(img["image_id"])
+
+        if len(all_images) >= per_page:
+            break
+
+    return all_images
 
 # --------------- public API ---------------
 
