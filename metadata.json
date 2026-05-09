@@ -1,0 +1,6 @@
+{
+  "name": "EeezTrip",
+  "description": "EeezTrip: A smart trip planning assistant that generates detailed itineraries, booking links, budget breakdowns, and hidden gems using AI.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}

@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Saved Trips
+    match /saved_trips/{tripId} {
+      function isValidTrip(data) {
+        return data.keys().hasAll(['userId', 'title', 'content', 'createdAt']) &&
+               data.userId is string &&
+               data.title is string && data.title.size() <= 200 &&
+               data.content is string && data.content.size() <= 20000 &&
+               data.createdAt == request.time;
+      }
+
+      allow create: if isVerified() && isValidTrip(request.resource.data) && isOwner(request.resource.data.userId);
+      allow get, list: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      function isValidReview(data) {
+        return data.keys().hasAll(['destination', 'userId', 'userName', 'rating', 'review', 'createdAt']) &&
+               data.destination is string && data.destination.size() <= 200 &&
+               data.userId is string &&
+               data.userName is string &&
+               data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+               data.review is string && data.review.size() <= 2000 &&
+               data.createdAt == request.time;
+      }
+
+      allow create: if isVerified() && isValidReview(request.resource.data) && isOwner(request.resource.data.userId);
+      allow read: if true; // Reviews are public
+      allow delete: if isOwner(resource.data.userId);
+    }
+  }
+}

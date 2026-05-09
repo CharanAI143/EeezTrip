@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "SavedTrip": {
+      "title": "Saved Trip",
+      "description": "A trip plan saved by a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who saved the trip" },
+        "title": { "type": "string", "description": "Title of the trip" },
+        "destination": { "type": "string", "description": "The target destination" },
+        "content": { "type": "string", "description": "The full markdown content of the itinerary" },
+        "markers": { "type": "string", "description": "JSON string of map markers" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the trip was saved" }
+      },
+      "required": ["userId", "title", "content", "createdAt"]
+    },
+    "DestinationReview": {
+      "title": "Destination Review",
+      "description": "A review of a destination by a user",
+      "type": "object",
+      "properties": {
+        "destination": { "type": "string", "description": "The name of the destination being reviewed" },
+        "userId": { "type": "string", "description": "The UID of the reviewer" },
+        "userName": { "type": "string", "description": "The display name of the reviewer" },
+        "userPhoto": { "type": "string", "description": "The photo URL of the reviewer" },
+        "rating": { "type": "number", "description": "Rating from 1 to 5" },
+        "review": { "type": "string", "description": "The text of the review" },
+        "videoUrl": { "type": "string", "description": "Optional video URL for the review" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the review was posted" }
+      },
+      "required": ["destination", "userId", "rating", "review", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/saved_trips/{tripId}": {
+      "schema": "SavedTrip",
+      "description": "Collection of saved trips"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "DestinationReview",
+      "description": "Collection of destination reviews"
+    }
+  }
+}
