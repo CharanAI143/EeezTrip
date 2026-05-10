@@ -508,8 +508,16 @@ export default function ResultsPage() {
             </button>
             <button
               className="btn btn-pink"
-              onClick={() => window.print()}
+              onClick={() => navigate('booking')}
               style={{ borderRadius: 999, padding: '16px 32px' }}
+            >
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+              Book Trip
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={() => window.print()}
+              style={{ borderRadius: 999, padding: '16px 32px', borderColor: '#e2e8f0', color: '#64748b' }}
             >
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.724.092m6.524-4.659A15.455 15.455 0 0113.5 15.3m0 0l-3-3m3 3l3-3m-8.25-3c.24-.03.48-.062.724-.092m6.524 4.659A15.455 15.455 0 0010.5 15.3m0 0l3-3m-3 3l-3-3m12.25 1.5c0 2.485-2.015 4.5-4.5 4.5H6.75C4.265 19.5 2.25 17.485 2.25 15c0-2.485 2.015-4.5 4.5-4.5h10.5c2.485 0 4.5 2.015 4.5 4.5z" /></svg>
               Save Itinerary

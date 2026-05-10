@@ -1,6 +1,7 @@
 // ─── Trip Request ────────────────────────────────────────────────────────────
 
 export type TripPreferences = {
+  planningType: 'detailed' | 'mood';
   origin: string;
   destination: string;
   mood: string;
@@ -38,6 +39,7 @@ export type CostBreakdown = {
 };
 
 export type Recommendation = {
+  destination?: string;
   title: string;
   tagline: string;
   summary: string;
@@ -62,7 +64,7 @@ export type PlaceImage = {
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
-export type Page = 'landing' | 'start' | 'preferences' | 'results';
+export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'preferences' | 'results' | 'booking';
 
 // ─── Mood Option ─────────────────────────────────────────────────────────────
 

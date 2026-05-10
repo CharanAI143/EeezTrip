@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { useTripStore } from '../state/tripStore';
 import { MoodOption } from '../types';
 
@@ -56,6 +56,12 @@ export default function PreferencesPage() {
 
   const [budgetInput, setBudgetInput] = useState(String(prefs.budget));
 
+  useEffect(() => {
+    if (prefs.planningType === 'detailed' && (!prefs.destination || prefs.destination.trim().length < 2)) {
+      navigate('start');
+    }
+  }, [prefs.destination, prefs.planningType, navigate]);
+
   const setMood = (mood: string) => dispatch({ type: 'SET_PREF', field: 'mood', value: mood });
   const setDays = (days: number) => dispatch({ type: 'SET_PREF', field: 'days', value: days });
   const setMode = (mode: string) => dispatch({ type: 'SET_PREF', field: 'mode', value: mode });
@@ -84,6 +90,22 @@ export default function PreferencesPage() {
         maxWidth: 960, margin: '0 auto',
         padding: '120px 24px 60px',
       }}>
+        {/* Back */}
+        <button
+          onClick={() => navigate(prefs.planningType === 'detailed' ? 'start' : 'mood-start')}
+          style={{
+            position: 'absolute', top: 90, left: 32,
+            background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
+          }}
+        >
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Back
+        </button>
+
         {/* Header */}
         <div className="anim-fade-up" style={{ textAlign: 'center', marginBottom: 56 }}>
           <button
@@ -326,7 +348,7 @@ export default function PreferencesPage() {
               Choose Generation Engine
             </h2>
             <p style={{ color: '#5b8bad', fontSize: '0.95rem', marginBottom: 24 }}>
-              Normal mode generates instantly. Deep mode uses an advanced local LLM (gpt-oss:120b) for better recommendations.
+              Normal mode generates instantly. Deep mode uses a local OSS model for richer recommendations.
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -374,7 +396,7 @@ export default function PreferencesPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={state.loading}
+            disabled={state.loading || (prefs.planningType === 'detailed' && prefs.destination.trim().length < 1)}
             className="btn btn-pink btn-lg"
             style={{
               width: '100%', borderRadius: 20, fontSize: '1.15rem', padding: '20px',

@@ -1,18 +1,19 @@
 import { useTripStore } from '../state/tripStore';
 import { Page } from '../types';
 
-const NAV_LINKS: { page: Page; label: string }[] = [
+const BASE_LINKS: { page: Page; label: string }[] = [
   { page: 'landing', label: 'Home' },
   { page: 'start', label: 'Get Started' },
-  { page: 'preferences', label: 'Preferences' },
-  { page: 'results', label: 'Results' },
 ];
 
 const PAGE_PROGRESS: Record<Page, number> = {
   landing: 0,
-  start: 33,
-  preferences: 66,
-  results: 100,
+  choice: 12,
+  start: 25,
+  'mood-start': 25,
+  preferences: 50,
+  results: 75,
+  booking: 100,
 };
 
 const PLANE_SVG = (
@@ -87,7 +88,16 @@ export default function Navbar() {
 
         {/* Nav links */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {NAV_LINKS.map(({ page, label }) => {
+          {(() => {
+            const navLinks = [...BASE_LINKS];
+            if (state.preferences.destination.trim().length > 0) {
+              navLinks.push({ page: 'preferences', label: 'Preferences' });
+            }
+            if (state.recommendation) {
+              navLinks.push({ page: 'results', label: 'Results' });
+            }
+            return navLinks;
+          })().map(({ page, label }) => {
             const active = state.page === page;
             return (
               <button
@@ -120,7 +130,7 @@ export default function Navbar() {
 
         {/* CTA */}
         <button
-          onClick={() => navigate('start')}
+          onClick={() => navigate('choice')}
           className="btn btn-primary btn-sm"
           style={{ borderRadius: 999 }}
         >

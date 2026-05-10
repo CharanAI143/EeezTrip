@@ -418,6 +418,92 @@ h1, h2, h3, h4, h5, h6 {
   animation: fadeUp 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+/* ── Floating Animations ── */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes float-slow {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes float-fast {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.animate-float-fast {
+  animation: float-fast 4s ease-in-out infinite;
+}
+
+/* ── Floating Grid Composition ── */
+.hero-floating-grid {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  perspective: 1000px;
+}
+
+.hero-card {
+  position: absolute;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 24px 50px rgba(12, 27, 51, 0.2);
+  border: 6px solid #fff;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hero-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hero-card-1 {
+  width: 280px;
+  height: 380px;
+  top: 0;
+  right: 15%;
+  z-index: 2;
+  transform: rotate(3deg);
+}
+.hero-card-1:hover { transform: rotate(0deg) scale(1.05); z-index: 10; }
+
+.hero-card-2 {
+  width: 220px;
+  height: 280px;
+  bottom: 20px;
+  left: 0;
+  z-index: 3;
+  transform: rotate(-5deg);
+}
+.hero-card-2:hover { transform: rotate(0deg) scale(1.05); z-index: 10; }
+
+.hero-card-3 {
+  width: 200px;
+  height: 240px;
+  top: 40px;
+  right: 0;
+  z-index: 1;
+  transform: rotate(8deg);
+  opacity: 0.9;
+}
+.hero-card-3:hover { transform: rotate(0deg) scale(1.05); z-index: 10; opacity: 1; }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .container, .container-narrow { padding: 0 16px; }

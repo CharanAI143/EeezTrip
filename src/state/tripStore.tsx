@@ -27,12 +27,15 @@ type Action =
   | { type: 'SET_PREF'; field: keyof TripPreferences; value: string | number }
   | { type: 'SUBMIT_START' }
   | { type: 'SUBMIT_SUCCESS'; recommendation: Recommendation; images: PlaceImage[] }
+  | { type: 'SET_IMAGES'; images: PlaceImage[] }
+  | { type: 'SET_RECOMMENDATION'; recommendation: Recommendation }
   | { type: 'SUBMIT_ERROR'; error: string }
   | { type: 'RESET' };
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 
 const initialPrefs: TripPreferences = {
+  planningType: 'detailed',
   origin: '',
   destination: '',
   mood: 'Relaxed',
@@ -75,6 +78,16 @@ function reducer(state: State, action: Action): State {
         recommendation: action.recommendation,
         images: action.images,
       };
+    case 'SET_IMAGES':
+      return {
+        ...state,
+        images: action.images,
+      };
+    case 'SET_RECOMMENDATION':
+      return {
+        ...state,
+        recommendation: action.recommendation,
+      };
     case 'SUBMIT_ERROR':
       return { ...state, loading: false, error: action.error };
     case 'RESET':
@@ -91,6 +104,7 @@ type ContextValue = {
   dispatch: Dispatch<Action>;
   navigate: (page: Page) => void;
   submitTrip: () => Promise<void>;
+  setRecommendation: (recommendation: Recommendation) => void;
 };
 
 const TripContext = createContext<ContextValue | null>(null);
@@ -99,16 +113,32 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const navigate = (page: Page) => dispatch({ type: 'NAVIGATE', page });
+  const setRecommendation = (recommendation: Recommendation) =>
+    dispatch({ type: 'SET_RECOMMENDATION', recommendation });
 
   const submitTrip = async () => {
     dispatch({ type: 'SUBMIT_START' });
     try {
-      const [recommendation, images] = await Promise.all([
-        fetchRecommendation(state.preferences),
-        fetchImages(state.preferences.destination, 8),
-      ]);
-      dispatch({ type: 'SUBMIT_SUCCESS', recommendation, images });
+      const recommendation = await fetchRecommendation(state.preferences);
+      
+      // If AI chose a destination, sync it back to preferences
+      if (recommendation.destination && !state.preferences.destination) {
+        dispatch({
+          type: 'SET_PREF',
+          field: 'destination',
+          value: recommendation.destination,
+        });
+      }
+
+      dispatch({ type: 'SUBMIT_SUCCESS', recommendation, images: [] });
       navigate('results');
+
+      // Load images in background so itinerary appears faster.
+      fetchImages(recommendation.destination || state.preferences.destination, 8)
+        .then((images) => dispatch({ type: 'SET_IMAGES', images }))
+        .catch(() => {
+          // Silently ignore image fetch issues; itinerary is already available.
+        });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Request failed';
       dispatch({ type: 'SUBMIT_ERROR', error: msg });
@@ -116,7 +146,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <TripContext.Provider value={{ state, dispatch, navigate, submitTrip }}>
+    <TripContext.Provider value={{ state, dispatch, navigate, submitTrip, setRecommendation }}>
       {children}
     </TripContext.Provider>
   );

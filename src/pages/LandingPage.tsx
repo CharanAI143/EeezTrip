@@ -96,11 +96,8 @@ export default function LandingPage() {
       <section style={{
         minHeight: '100vh',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: '120px 24px 60px',
+        padding: '120px 24px 80px',
         position: 'relative',
         overflow: 'hidden',
       }}>
@@ -110,77 +107,93 @@ export default function LandingPage() {
           background: 'linear-gradient(160deg, #f0f9ff 0%, #fdf2f8 45%, #e0f2fe 100%)',
         }} />
 
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 820, margin: '0 auto' }}>
-          <div className={`badge badge-ice anim-fade-up ${visible ? '' : 'opacity-0'}`} style={{ marginBottom: 20 }}>
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: 4, display: 'inline' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-            </svg>
-            AI Travel Planner — Powered by Intelligence
-          </div>
-
-          <h1
-            className="anim-fade-up delay-100"
-            style={{
-              fontFamily: 'Outfit, sans-serif',
-              fontSize: 'clamp(2.6rem, 6vw, 5.5rem)',
-              fontWeight: 900,
-              lineHeight: 1.05,
-              letterSpacing: '-0.02em',
-              marginBottom: 24,
-              color: '#0c1b33',
-            }}
-          >
-            Your next trip,{' '}
-            <span className="text-gradient-duo">perfectly planned</span>
-            <br />in seconds.
-          </h1>
-
-          <p
-            className="anim-fade-up delay-200"
-            style={{
-              fontSize: 'clamp(1rem, 2vw, 1.25rem)',
-              color: '#2d5474',
-              maxWidth: 620,
-              margin: '0 auto 40px',
-              lineHeight: 1.7,
-            }}
-          >
-            Tell us your destination, mood, and budget.
-            EeezTrip's AI crafts a jaw-dropping itinerary — complete with stunning photography,
-            daily plans, local food picks, and a smart cost breakdown.
-          </p>
-
-          <div className="anim-fade-up delay-300" style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-primary btn-lg"
-              onClick={() => navigate('start')}
-            >
-              Start Planning Free
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-              </svg>
-            </button>
-            <button
-              className="btn btn-outline btn-lg"
-              onClick={() => navigate('start')}
-              style={{ borderRadius: 999 }}
-            >
-              See How It Works
-            </button>
-          </div>
-        </div>
-
-        {/* Scroll cue */}
-        <div style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', opacity: 0.5 }}>
+        <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <div style={{
-            width: 24, height: 38, borderRadius: 12, border: '2px solid #38bdf8',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 6,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '60px',
+            alignItems: 'center',
           }}>
-            <div style={{
-              width: 4, height: 8, borderRadius: 2,
-              background: '#38bdf8',
-              animation: 'float 2s ease-in-out infinite',
-            }} />
+            {/* Left Column: Text & CTA */}
+            <div style={{ textAlign: 'left', maxWidth: 600 }}>
+              <div className={`badge badge-ice anim-fade-up ${visible ? '' : 'opacity-0'}`} style={{ marginBottom: 24, display: 'inline-flex' }}>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: 6 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                </svg>
+                AI Travel Planner — Powered by Intelligence
+              </div>
+
+              <h1
+                className="anim-fade-up delay-100"
+                style={{
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: 'clamp(3rem, 5vw, 5.2rem)',
+                  fontWeight: 900,
+                  lineHeight: 1.08,
+                  letterSpacing: '-0.03em',
+                  marginBottom: 24,
+                  color: '#0c1b33',
+                }}
+              >
+                Your next trip, <br />
+                <span className="text-gradient-duo">perfectly planned</span>
+                <br />in seconds.
+              </h1>
+
+              <p
+                className="anim-fade-up delay-200"
+                style={{
+                  fontSize: '1.15rem',
+                  color: '#2d5474',
+                  marginBottom: 40,
+                  lineHeight: 1.65,
+                }}
+              >
+                Tell us your destination, mood, and budget.
+                EeezTrip's AI crafts a jaw-dropping itinerary — complete with stunning photography,
+                daily plans, local food picks, and a smart cost breakdown.
+              </p>
+
+              <div className="anim-fade-up delay-300" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-primary btn-lg"
+                  onClick={() => navigate('choice')}
+                >
+                  Start Planning Free
+                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+                <button
+                  className="btn btn-outline btn-lg"
+                  onClick={() => {
+                    const features = document.getElementById('features-section');
+                    if (features) features.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  style={{ borderRadius: 999 }}
+                >
+                  See How It Works
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Floating 3D Image Composition */}
+            <div className="anim-fade-up delay-400" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div className="hero-floating-grid">
+                {/* Image 1: Main Top Right */}
+                <div className="hero-card hero-card-1 animate-float">
+                  <img src="https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?q=80&w=600&auto=format&fit=crop" alt="Santorini" />
+                </div>
+                {/* Image 2: Bottom Left */}
+                <div className="hero-card hero-card-2 animate-float-fast" style={{ animationDelay: '1s' }}>
+                  <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop" alt="Kyoto" />
+                </div>
+                {/* Image 3: Far Right Behind */}
+                <div className="hero-card hero-card-3 animate-float-slow" style={{ animationDelay: '2s' }}>
+                  <img src="https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=600&auto=format&fit=crop" alt="Swiss Alps" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -273,7 +286,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ─────────────────────────────────────────────────── */}
-      <section style={{
+      <section id="features-section" style={{
         padding: '80px 24px',
         background: 'linear-gradient(180deg, transparent, rgba(224,242,254,0.4), transparent)',
         position: 'relative', zIndex: 1,
@@ -368,7 +381,7 @@ export default function LandingPage() {
             </p>
             <button
               className="btn btn-ghost btn-lg"
-              onClick={() => navigate('start')}
+              onClick={() => navigate('choice')}
               style={{ fontSize: '1.1rem', borderRadius: 999, padding: '16px 36px', background: 'rgba(255,255,255,0.1)' }}
             >
               Plan My Trip Now
