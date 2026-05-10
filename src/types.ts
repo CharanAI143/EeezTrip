@@ -64,7 +64,29 @@ export type PlaceImage = {
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
-export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'preferences' | 'results' | 'booking';
+export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'preferences' | 'results' | 'booking' | 'dashboard' | 'reviews';
+
+// ─── Database Records ───────────────────────────────────────────────────────
+
+export type Review = {
+  id?: string;
+  user_id?: string;
+  destination: string;
+  rating: number;
+  comment: string;
+  video_url?: string | null;
+  created_at?: string;
+};
+
+export type TripRecord = {
+  id: string;
+  user_id: string;
+  label: string;
+  destination: string;
+  trip: Recommendation;
+  preferences?: TripPreferences;
+  created_at: string;
+};
 
 // ─── Mood Option ─────────────────────────────────────────────────────────────
 

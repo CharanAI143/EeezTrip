@@ -10,6 +10,7 @@ export default function ChoicePage() {
 
   const handleMood = () => {
     dispatch({ type: 'SET_PREF', field: 'planningType', value: 'mood' });
+    dispatch({ type: 'SET_PREF', field: 'destination', value: '' });
     navigate('mood-start');
   };
 

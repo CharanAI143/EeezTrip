@@ -4,7 +4,10 @@ import {
   ReactNode,
   useContext,
   useReducer,
+  useEffect,
 } from 'react';
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { fetchImages, fetchRecommendation, reviseRecommendation } from '../api/client';
 import { Page, PlaceImage, Recommendation, TripPreferences } from '../types';
 
@@ -19,6 +22,7 @@ type State = {
   images: PlaceImage[];
   revising: boolean;
   reviseError: string;
+  user: User | null;
 };
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -35,6 +39,7 @@ type Action =
   | { type: 'REVISE_START' }
   | { type: 'REVISE_SUCCESS'; recommendation: Recommendation }
   | { type: 'REVISE_ERROR'; error: string }
+  | { type: 'SET_USER'; user: User | null }
   | { type: 'RESET' };
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -58,6 +63,7 @@ const initialState: State = {
   images: [],
   revising: false,
   reviseError: '',
+  user: null,
 };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -103,6 +109,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, revising: false, recommendation: action.recommendation };
     case 'REVISE_ERROR':
       return { ...state, revising: false, reviseError: action.error };
+    case 'SET_USER':
+      return { ...state, user: action.user };
     case 'RESET':
       return { ...initialState };
     default:
@@ -126,6 +134,13 @@ const TripContext = createContext<ContextValue | null>(null);
 export function TripProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      dispatch({ type: 'SET_USER', user });
+    });
+    return unsubscribe;
+  }, []);
+
   const navigate = (page: Page) => dispatch({ type: 'NAVIGATE', page });
   const setRecommendation = (recommendation: Recommendation) =>
     dispatch({ type: 'SET_RECOMMENDATION', recommendation });
@@ -136,8 +151,9 @@ export function TripProvider({ children }: { children: ReactNode }) {
       const finalPrefs = overridePrefs ? { ...state.preferences, ...overridePrefs } : state.preferences;
       const recommendation = await fetchRecommendation(finalPrefs);
       
-      // If AI chose a destination, sync it back to preferences
-      if (recommendation.destination && !state.preferences.destination) {
+      // Always sync the actual AI-chosen destination back into preferences
+      // so it never goes stale when the user generates a second trip.
+      if (recommendation.destination) {
         dispatch({
           type: 'SET_PREF',
           field: 'destination',

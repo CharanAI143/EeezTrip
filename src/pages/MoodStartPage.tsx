@@ -9,7 +9,7 @@ export default function MoodStartPage() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (origin.trim().length >= 2) navigate('preferences');
+    navigate('preferences');
   };
 
   return (
@@ -104,13 +104,13 @@ export default function MoodStartPage() {
                   onChange={e => dispatch({ type: 'SET_PREF', field: 'origin', value: e.target.value })}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  placeholder="Leaving from..."
-                  required
+                  placeholder="Leaving from (Optional)"
                   minLength={2}
                   style={{
                     flex: 1, border: 'none', outline: 'none', background: 'transparent',
                     padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
                     fontSize: '1.15rem', fontWeight: 500, color: '#0c1b33',
+                    minWidth: 0,
                   }}
                 />
               </div>
@@ -118,11 +118,11 @@ export default function MoodStartPage() {
               <button
                 type="submit"
                 className="btn btn-pink"
-                disabled={origin.trim().length < 2}
                 style={{
                   margin: 8, borderRadius: 999,
                   padding: '14px 36px',
                   fontSize: '1.05rem',
+                  flexShrink: 0,
                 }}
               >
                 Continue

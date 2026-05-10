@@ -8,6 +8,8 @@ import MoodStartPage from './pages/MoodStartPage';
 import PreferencesPage from './pages/PreferencesPage';
 import ResultsPage from './pages/ResultsPage';
 import BookingPage from './pages/BookingPage';
+import DashboardPage from './pages/DashboardPage';
+import ReviewsPage from './pages/ReviewsPage';
 import { ChatBot } from './components/ChatBot';
 
 function AppRouter() {
@@ -21,6 +23,8 @@ function AppRouter() {
     preferences: <PreferencesPage />,
     results: <ResultsPage />,
     booking: <BookingPage />,
+    dashboard: <DashboardPage />,
+    reviews: <ReviewsPage />,
   };
 
   return (

@@ -1,8 +1,12 @@
 import { useTripStore } from '../state/tripStore';
 import { Page } from '../types';
+import { useState } from 'react';
+import { signInWithPopup, googleProvider, auth, signOut } from '../lib/firebase';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const BASE_LINKS: { page: Page; label: string }[] = [
   { page: 'landing', label: 'Home' },
+  { page: 'reviews', label: 'Reviews' },
   { page: 'start', label: 'Get Started' },
 ];
 
@@ -24,7 +28,26 @@ const PLANE_SVG = (
 
 export default function Navbar() {
   const { state, navigate } = useTripStore();
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const progress = PAGE_PROGRESS[state.page];
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      console.error("Login failed", e);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      setUserDropdownOpen(false);
+      if (state.page === 'dashboard') navigate('landing');
+    } catch (e) {
+      console.error("Sign out failed", e);
+    }
+  };
 
   return (
     <header style={{
@@ -128,14 +151,87 @@ export default function Navbar() {
           })}
         </div>
 
-        {/* CTA */}
-        <button
-          onClick={() => navigate('choice')}
-          className="btn btn-primary btn-sm"
-          style={{ borderRadius: 999 }}
-        >
-          Plan a Trip ✈
-        </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            onClick={() => navigate('choice')}
+            className="btn btn-primary btn-sm"
+            style={{ borderRadius: 999 }}
+          >
+            Plan a Trip ✈
+          </button>
+
+          {state.user ? (
+            <div style={{ position: 'relative' }}>
+              <button 
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                style={{
+                  background: 'none', padding: 0, cursor: 'pointer',
+                  width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
+                  border: '2px solid #0284c7'
+                }}
+              >
+                <img src={state.user.photoURL || `https://ui-avatars.com/api/?name=${state.user.displayName}`} alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </button>
+
+              <AnimatePresence>
+                {userDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    style={{
+                      position: 'absolute', top: 50, right: 0,
+                      background: '#fff', borderRadius: 16,
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                      border: '1px solid #e2e8f0', overflow: 'hidden',
+                      width: 200, zIndex: 999,
+                    }}
+                  >
+                    <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>{state.user.displayName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{state.user.email}</div>
+                    </div>
+                    <div style={{ padding: 8, display: 'flex', flexDirection: 'column' }}>
+                      <button 
+                        onClick={() => { navigate('dashboard'); setUserDropdownOpen(false); }}
+                        style={{ background: 'none', border: 'none', padding: '10px 12px', textAlign: 'left', borderRadius: 8, cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        🗺️ My Trips
+                      </button>
+                      <button 
+                        onClick={handleSignOut}
+                        style={{ background: 'none', border: 'none', padding: '10px 12px', textAlign: 'left', borderRadius: 8, cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, color: '#dc2626' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        🚪 Sign Out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <button
+              onClick={handleSignIn}
+              style={{
+                fontFamily: 'Outfit, sans-serif',
+                fontWeight: 600, fontSize: '0.9rem',
+                color: '#fff', background: '#0f172a',
+                border: 'none', borderRadius: 999,
+                padding: '8px 20px', cursor: 'pointer',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#334155'}
+              onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}
+            >
+              Sign In
+            </button>
+          )}
+        </div>
       </nav>
 
       {/* Progress bar */}

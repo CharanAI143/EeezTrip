@@ -22,7 +22,7 @@ export default function GetStartedPage() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (origin.trim().length >= 2 && destination.trim().length >= 2) navigate('preferences');
+    if (destination.trim().length >= 2) navigate('preferences');
   };
 
   const selectDestination = (name: string) => {
@@ -120,13 +120,13 @@ export default function GetStartedPage() {
                   onChange={e => dispatch({ type: 'SET_PREF', field: 'origin', value: e.target.value })}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  placeholder="Leaving from..."
-                  required
+                  placeholder="Leaving from (Optional)"
                   minLength={2}
                   style={{
                     flex: 1, border: 'none', outline: 'none', background: 'transparent',
                     padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
                     fontSize: '1.15rem', fontWeight: 500, color: '#0c1b33',
+                    minWidth: 0,
                   }}
                 />
                 <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
@@ -156,6 +156,7 @@ export default function GetStartedPage() {
                     flex: 1, border: 'none', outline: 'none', background: 'transparent',
                     padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
                     fontSize: '1.15rem', fontWeight: 500, color: '#0c1b33',
+                    minWidth: 0,
                   }}
                 />
               </div>
@@ -163,11 +164,12 @@ export default function GetStartedPage() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={origin.trim().length < 2 || destination.trim().length < 2}
+                disabled={destination.trim().length < 2}
                 style={{
                   margin: 8, borderRadius: 999,
                   padding: '14px 36px',
                   fontSize: '1.05rem',
+                  flexShrink: 0,
                 }}
               >
                 Continue

@@ -37,6 +37,23 @@ export async function fetchImages(
   }
 }
 
+export interface WeatherData {
+  temperature_max: number;
+  temperature_min: number;
+  condition: string;
+  is_day: number;
+}
+
+export async function fetchWeather(destination: string): Promise<WeatherData | null> {
+  try {
+    const res = await fetch(`${BASE}/weather?place=${encodeURIComponent(destination)}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export interface ChatMessagePayload {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -118,4 +135,40 @@ export async function reviseRecommendation(
   }
 
   return res.json();
+}
+
+export async function fetchReviews(destination?: string): Promise<any[]> {
+  const url = destination ? `${BASE}/reviews?destination=${encodeURIComponent(destination)}` : `${BASE}/reviews`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.reviews || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function submitReview(review: any): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(review),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchTripsFromDB(userId: string = "all"): Promise<any[]> {
+  try {
+    const res = await fetch(`${BASE}/trips?user_id=${encodeURIComponent(userId)}&limit=50`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.trips || [];
+  } catch {
+    return [];
+  }
 }

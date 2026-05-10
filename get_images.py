@@ -214,16 +214,16 @@ def get_place_images(
         return cache[key]["images"]
 
     used_ids = _build_used_ids(cache)
-    print(f"⏳ Fetching images for '{place_name}' from Wikimedia Commons...")
+    print(f"Fetching images for '{place_name}' from Wikimedia Commons...")
     query_name = f"{place_name} {state}".strip()
     images = fetch_from_wikimedia(query_name, place_name, per_page, used_ids, tags)
 
     if images:
         cache[key] = {"place": place_name, "state": state, "images": images}
         save_cache(cache)
-        print(f"✓ Cached {len(images)} images for '{place_name}'")
+        print(f"Cached {len(images)} images for '{place_name}'")
     else:
-        print(f"⚠️  No images found for '{place_name}'")
+        print(f"No images found for '{place_name}'")
 
     return images
 

@@ -1,11 +1,13 @@
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import sys
 import random
 import json
 import io
 import os
 import re
+import datetime
+from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import ollama
 import requests
@@ -20,7 +22,62 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi import Request
 
-app = FastAPI(title="EeezTrip API", version="2.0.0")
+# ─── MongoDB (motor async driver) ────────────────────────────────────────────
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from bson import ObjectId
+    import certifi
+    HAS_MONGO = True
+except ImportError:
+    HAS_MONGO = False
+    print("[WARN] motor / pymongo not installed — MongoDB endpoints will be unavailable.")
+
+MONGO_URI = os.getenv("MONGODB_URI", "")
+MONGO_DB  = os.getenv("MONGODB_DB_NAME", "eeeztrip")
+
+_mongo_client: Any = None
+_mongo_db: Any = None
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    global _mongo_client, _mongo_db
+    if HAS_MONGO and MONGO_URI:
+        try:
+            _mongo_client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=8000, tlsCAFile=certifi.where())
+            await _mongo_client.admin.command("ping")
+            _mongo_db = _mongo_client[MONGO_DB]
+            # Create indexes for common query patterns
+            await _mongo_db.trips.create_index("user_id")
+            await _mongo_db.trips.create_index("created_at")
+            await _mongo_db.bookings.create_index("user_id")
+            await _mongo_db.group_sync.create_index("session_id", unique=True)
+            print(f"[MongoDB] Connected to Atlas — db: {MONGO_DB}")
+        except Exception as exc:
+            print(f"[MongoDB] Connection FAILED: {exc}")
+            _mongo_client = None
+            _mongo_db = None
+    else:
+        print("[MongoDB] MONGODB_URI not set — skipping Atlas connection.")
+    yield
+    if _mongo_client:
+        _mongo_client.close()
+        print("[MongoDB] Connection closed.")
+
+
+def get_db():
+    if _mongo_db is None:
+        raise HTTPException(status_code=503, detail="MongoDB is not connected. Check MONGODB_URI in .env.")
+    return _mongo_db
+
+
+def _id_to_str(doc: dict) -> dict:
+    """Convert ObjectId _id to string for JSON serialisation."""
+    if doc and "_id" in doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+app = FastAPI(title="EeezTrip API", version="2.0.0", lifespan=lifespan)
 
 LOCAL_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:31b-cloud").strip() or "gemma4:31b-cloud"
 DEEP_MODE_TIMEOUT_SEC = int(os.getenv("DEEP_MODE_TIMEOUT_SEC", "12"))
@@ -99,12 +156,57 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] = Field(default_factory=list)
 
 
+class WeatherResponse(BaseModel):
+    temperature_max: float
+    temperature_min: float
+    condition: str
+    is_day: int = 1
+
+
 class ChatResponse(BaseModel):
     reply: str
 
 
 class TranscriptionResponse(BaseModel):
     transcript: str
+
+
+# ─── MongoDB Pydantic Models ──────────────────────────────────────────────────
+
+class SaveTripRequest(BaseModel):
+    user_id: str = "anonymous"
+    trip: TripResponse
+    preferences: Optional[TripRequest] = None
+    label: str = ""
+
+
+class SavedTripOut(BaseModel):
+    id: str
+    user_id: str
+    label: str
+    destination: Optional[str] = None
+    created_at: str
+
+
+class BookingRequest(BaseModel):
+    user_id: str = "anonymous"
+    trip_id: str = ""
+    destination: str
+    check_in: str
+    check_out: str
+    guests: int = 1
+    hotel: str = ""
+    transport_mode: str = ""
+    total_cost_inr: int = 0
+    notes: str = ""
+
+
+class GroupSyncRequest(BaseModel):
+    session_id: str
+    host_user_id: str = "anonymous"
+    destination: str = ""
+    preferences: dict = Field(default_factory=dict)
+    members: List[str] = Field(default_factory=list)
 
 
 class TransportOption(BaseModel):
@@ -496,6 +598,7 @@ You MUST respond with a valid JSON object matching this schema perfectly:
 Important rules:
 1. ONLY return the JSON object, absolutely no markdown formatting, no code blocks, no extra text.
 2. The values in estimated_cost_breakdown MUST sum up to exactly {req.budget} and MUST be integers (Indian Rupees).
+3. For the transport budget, estimate for a ROUND TRIP (both ways). Only include flight expenses if the origin and destination are in completely different nations. Otherwise, prioritize ground transport.
 """
     try:
         model = resolve_ollama_model(LOCAL_OLLAMA_MODEL)
@@ -844,7 +947,7 @@ def recommend_trip(req: TripRequest):
             valid_transports = [t.price_inr for t in transport_opts if t.price_inr]
             if valid_transports:
                 avg_transport = sum(valid_transports) / len(valid_transports)
-                trip.estimated_cost_breakdown.transport = int(avg_transport)
+                trip.estimated_cost_breakdown.transport = int(avg_transport * 2)
     except Exception as e:
         print(f"Failed to sync live prices to budget: {e}")
 
@@ -911,3 +1014,222 @@ else:
             detail="Audio transcription is unavailable on this server (missing python-multipart).",
         )
 
+@app.get("/api/weather", response_model=WeatherResponse)
+def get_weather(place: str = Query(..., min_length=2)):
+    """Fetch live weather forecast using Open-Meteo."""
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={place}&count=1"
+        geo_resp = requests.get(geo_url, timeout=5)
+        geo_data = geo_resp.json()
+        
+        if not geo_data.get("results"):
+            return {"temperature_max": 28.5, "temperature_min": 20.0, "condition": "Partly cloudy", "is_day": 1}
+            
+        lat = geo_data["results"][0]["latitude"]
+        lon = geo_data["results"][0]["longitude"]
+        
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,is_day,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
+        w_resp = requests.get(weather_url, timeout=5)
+        w_data = w_resp.json()
+        
+        current = w_data.get("current", {})
+        daily = w_data.get("daily", {})
+        
+        code = current.get("weather_code", 0)
+        is_day = current.get("is_day", 1)
+        
+        condition = "Clear"
+        if code in [1, 2, 3]:
+            condition = "Partly cloudy" if code == 1 else "Cloudy"
+        elif code in [45, 48]:
+            condition = "Foggy"
+        elif code in [51, 53, 55, 56, 57]:
+            condition = "Drizzle"
+        elif code in [61, 63, 65, 66, 67]:
+            condition = "Rain"
+        elif code in [71, 73, 75, 77]:
+            condition = "Snow"
+        elif code in [80, 81, 82]:
+            condition = "Showers"
+        elif code in [95, 96, 99]:
+            condition = "Thunderstorm"
+            
+        temp_max = daily.get("temperature_2m_max", [0])[0] if daily.get("temperature_2m_max") else current.get("temperature_2m", 0)
+        temp_min = daily.get("temperature_2m_min", [0])[0] if daily.get("temperature_2m_min") else current.get("temperature_2m", 0)
+
+        return {
+            "temperature_max": temp_max,
+            "temperature_min": temp_min,
+            "condition": condition,
+            "is_day": is_day
+        }
+    except Exception as e:
+        print(f"Weather error: {e}")
+        return {"temperature_max": 26.0, "temperature_min": 18.0, "condition": "Sunny", "is_day": 1}
+
+
+# ─── MongoDB CRUD Endpoints ───────────────────────────────────────────────────
+
+@app.get("/api/db/status")
+async def db_status():
+    """Check MongoDB Atlas connection status."""
+    if _mongo_db is None:
+        return {"connected": False, "message": "MongoDB not connected. Check MONGODB_URI in .env."}
+    try:
+        await _mongo_client.admin.command("ping")
+        db_names = await _mongo_client.list_database_names()
+        return {"connected": True, "database": MONGO_DB, "all_databases": db_names}
+    except Exception as exc:
+        return {"connected": False, "error": str(exc)}
+
+
+# ── Trips ──────────────────────────────────────────────────────────────────────
+
+@app.post("/api/trips", status_code=201)
+async def save_trip(body: SaveTripRequest):
+    """Persist a generated trip itinerary to MongoDB."""
+    db = get_db()
+    doc = {
+        "user_id": body.user_id,
+        "label": body.label or (body.trip.destination or "My Trip"),
+        "destination": body.trip.destination,
+        "trip": body.trip.model_dump(),
+        "preferences": body.preferences.model_dump() if body.preferences else None,
+        "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    result = await db.trips.insert_one(doc)
+    return {"id": str(result.inserted_id), "message": "Trip saved successfully."}
+
+
+@app.get("/api/trips")
+async def list_trips(user_id: str = "anonymous", limit: int = 20):
+    """Retrieve saved trips for a user."""
+    db = get_db()
+    query = {} if user_id == "all" else {"user_id": user_id}
+    cursor = db.trips.find(query).sort("created_at", -1).limit(limit)
+    trips = []
+    async for doc in cursor:
+        trips.append({
+            "id": str(doc["_id"]),
+            "user_id": doc.get("user_id"),
+            "label": doc.get("label"),
+            "destination": doc.get("destination"),
+            "trip": doc.get("trip"),
+            "preferences": doc.get("preferences"),
+            "created_at": doc.get("created_at"),
+        })
+    return {"trips": trips, "count": len(trips)}
+
+
+@app.get("/api/trips/{trip_id}")
+async def get_trip(trip_id: str):
+    """Fetch a single saved trip by its MongoDB ObjectId."""
+    db = get_db()
+    try:
+        oid = ObjectId(trip_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid trip ID format.")
+    doc = await db.trips.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Trip not found.")
+    return _id_to_str(doc)
+
+
+@app.delete("/api/trips/{trip_id}")
+async def delete_trip(trip_id: str):
+    """Delete a saved trip."""
+    db = get_db()
+    try:
+        oid = ObjectId(trip_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid trip ID format.")
+    result = await db.trips.delete_one({"_id": oid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Trip not found.")
+    return {"message": "Trip deleted successfully."}
+
+
+# ── Bookings ───────────────────────────────────────────────────────────────────
+
+@app.post("/api/bookings", status_code=201)
+async def create_booking(body: BookingRequest):
+    """Save a booking record."""
+    db = get_db()
+    doc = {
+        **body.model_dump(),
+        "status": "confirmed",
+        "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    result = await db.bookings.insert_one(doc)
+    return {"id": str(result.inserted_id), "message": "Booking confirmed."}
+
+
+@app.get("/api/bookings")
+async def list_bookings(user_id: str = "anonymous"):
+    """List all bookings for a user."""
+    db = get_db()
+    query = {} if user_id == "all" else {"user_id": user_id}
+    cursor = db.bookings.find(query).sort("created_at", -1)
+    bookings = []
+    async for doc in cursor:
+        bookings.append(_id_to_str(doc))
+    return {"bookings": bookings, "count": len(bookings)}
+
+
+# ── Group Sync ─────────────────────────────────────────────────────────────────
+
+@app.post("/api/group-sync", status_code=201)
+async def create_group_sync(body: GroupSyncRequest):
+    """Create or update a group trip sync session."""
+    db = get_db()
+    doc = {
+        **body.model_dump(),
+        "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    await db.group_sync.update_one(
+        {"session_id": body.session_id},
+        {"$set": doc},
+        upsert=True,
+    )
+    return {"session_id": body.session_id, "message": "Group sync session saved."}
+
+
+@app.get("/api/group-sync/{session_id}")
+async def get_group_sync(session_id: str):
+    """Retrieve a group trip sync session."""
+    db = get_db()
+    doc = await db.group_sync.find_one({"session_id": session_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Group sync session not found.")
+    return _id_to_str(doc)
+
+# ── Reviews ────────────────────────────────────────────────────────────────────
+
+class ReviewRequest(BaseModel):
+    user_id: str = "anonymous"
+    destination: str
+    rating: int
+    comment: str
+    video_url: Optional[str] = None
+
+@app.post("/api/reviews", status_code=201)
+async def create_review(body: ReviewRequest):
+    """Save a review record."""
+    db = get_db()
+    doc = {
+        **body.model_dump(),
+        "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    result = await db.reviews.insert_one(doc)
+    return {"id": str(result.inserted_id), "message": "Review submitted successfully."}
+
+@app.get("/api/reviews")
+async def list_reviews(destination: Optional[str] = None):
+    """List reviews, optionally filtering by destination."""
+    db = get_db()
+    query = {"destination": destination} if destination else {}
+    cursor = db.reviews.find(query).sort("created_at", -1)
+    reviews = []
+    async for doc in cursor:
+        reviews.append(_id_to_str(doc))
+    return {"reviews": reviews, "count": len(reviews)}

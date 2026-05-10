@@ -6,14 +6,14 @@ const MOODS: MoodOption[] = [
   {
     id: 'Relaxed',
     label: 'Relaxed',
-    imageUrl: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?q=80&w=400&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=400&auto=format&fit=crop',
     description: 'Slow mornings, café walks, and golden-hour views',
     color: '#38bdf8',
   },
   {
     id: 'Romantic',
     label: 'Romantic',
-    imageUrl: 'https://images.unsplash.com/photo-1518182170546-076616fd62dc?q=80&w=400&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?q=80&w=400&auto=format&fit=crop',
     description: 'Sunset strolls, candlelit dinners, and scenic corners',
     color: '#ec4899',
     pinkAccent: true,
@@ -21,21 +21,21 @@ const MOODS: MoodOption[] = [
   {
     id: 'Adventure',
     label: 'Adventure',
-    imageUrl: 'https://images.unsplash.com/photo-1522163182402-834f871fd851?q=80&w=400&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=400&auto=format&fit=crop',
     description: 'Active days, viewpoint trails, and heart-pumping moves',
     color: '#0ea5e9',
   },
   {
     id: 'Nature',
     label: 'Nature',
-    imageUrl: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?q=80&w=400&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=400&auto=format&fit=crop',
     description: 'Green spaces, fresh air, and peaceful scenic calm',
     color: '#22c55e',
   },
   {
     id: 'Foodie',
     label: 'Foodie',
-    imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=400&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=400&auto=format&fit=crop',
     description: 'Local flavors, market hopping, and comfort meals',
     color: '#f97316',
   },
@@ -64,7 +64,6 @@ export default function PreferencesPage() {
 
   const setMood = (mood: string) => dispatch({ type: 'SET_PREF', field: 'mood', value: mood });
   const setDays = (days: number) => dispatch({ type: 'SET_PREF', field: 'days', value: days });
-  const setMode = (mode: string) => dispatch({ type: 'SET_PREF', field: 'mode', value: mode });
   const setBudget = (val: number) => {
     dispatch({ type: 'SET_PREF', field: 'budget', value: val });
     setBudgetInput(String(val));
@@ -108,19 +107,21 @@ export default function PreferencesPage() {
 
         {/* Header */}
         <div className="anim-fade-up" style={{ textAlign: 'center', marginBottom: 56 }}>
-          <button
-            onClick={() => navigate('start')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
-              marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto 20px',
-            }}
-          >
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            Change Destination
-          </button>
+          {prefs.planningType === 'detailed' && (
+            <button
+              onClick={() => navigate('start')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
+                marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto 20px',
+              }}
+            >
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              Change Destination
+            </button>
+          )}
 
           <div className="badge badge-pink" style={{ marginBottom: 16 }}>Step 2 of 2</div>
 
@@ -130,9 +131,11 @@ export default function PreferencesPage() {
             fontWeight: 900, color: '#0c1b33', marginBottom: 12,
             letterSpacing: '-0.02em',
           }}>
-            Curate your{' '}
-            <span className="text-gradient-duo">{prefs.destination}</span>
-            {' '}experience
+            {prefs.planningType === 'mood' ? (
+              <>Curate your <span className="text-gradient-duo">experience</span></>
+            ) : (
+              <>Curate your <span className="text-gradient-duo">{prefs.destination}</span> experience</>
+            )}
           </h1>
           <p style={{ color: '#5b8bad', fontSize: '1.1rem', maxWidth: 600, margin: '0 auto' }}>
             Select your vibe, set your budget, and choose your duration. We'll handcraft the perfect itinerary.
@@ -335,46 +338,16 @@ export default function PreferencesPage() {
             </div>
           </div>
 
-          {/* ── Engine Mode ────────────────────────────────────────── */}
-          <div className="glass anim-fade-up delay-400" style={{ padding: '32px', marginBottom: 40, boxShadow: '0 8px 30px rgba(12, 27, 51, 0.04)' }}>
-            <h2 style={{
-              fontFamily: 'Outfit, sans-serif', fontWeight: 800,
-              fontSize: '1.25rem', color: '#0c1b33', marginBottom: 8,
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ color: '#8b5cf6' }}>
+          {/* ── Engine Badge ────────────────────────────────────────── */}
+          <div className="glass anim-fade-up delay-400" style={{ padding: '20px 32px', marginBottom: 40, boxShadow: '0 8px 30px rgba(12, 27, 51, 0.04)', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', flexShrink: 0 }}>
+              <svg width="22" height="22" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H7.5a2.25 2.25 0 00-2.25 2.25v10.5a2.25 2.25 0 002.25 2.25z" />
               </svg>
-              Choose Generation Engine
-            </h2>
-            <p style={{ color: '#5b8bad', fontSize: '0.95rem', marginBottom: 24 }}>
-              Normal mode generates instantly. Deep mode uses a local OSS model for richer recommendations.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {[
-                { id: 'normal', title: 'Lightning Mode', desc: 'Instant planning', color: '#0ea5e9' },
-                { id: 'deep', title: 'Deep AI Mode', desc: 'Powered by Ollama', color: '#8b5cf6' }
-              ].map(m => {
-                const active = prefs.mode === m.id;
-                return (
-                  <div
-                    key={m.id}
-                    onClick={() => setMode(m.id)}
-                    style={{
-                      border: active ? `2px solid ${m.color}` : '1px solid rgba(0,0,0,0.06)',
-                      background: active ? `${m.color}0D` : '#fff',
-                      padding: 20, borderRadius: 16, cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.1rem', color: active ? m.color : '#0c1b33', marginBottom: 4 }}>
-                      {m.title}
-                    </div>
-                    <div style={{ color: '#5b8bad', fontSize: '0.85rem' }}>{m.desc}</div>
-                  </div>
-                );
-              })}
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#6d28d9' }}>Deep AI Mode — Active</div>
+              <div style={{ color: '#5b8bad', fontSize: '0.88rem', marginTop: 2 }}>Powered by your local Ollama OSS model for rich, detailed itineraries.</div>
             </div>
           </div>
 
