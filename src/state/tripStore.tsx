@@ -5,7 +5,7 @@ import {
   useContext,
   useReducer,
 } from 'react';
-import { fetchImages, fetchRecommendation } from '../api/client';
+import { fetchImages, fetchRecommendation, reviseRecommendation } from '../api/client';
 import { Page, PlaceImage, Recommendation, TripPreferences } from '../types';
 
 // ─── State Shape ─────────────────────────────────────────────────────────────
@@ -17,6 +17,8 @@ type State = {
   error: string;
   recommendation: Recommendation | null;
   images: PlaceImage[];
+  revising: boolean;
+  reviseError: string;
 };
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -30,6 +32,9 @@ type Action =
   | { type: 'SET_IMAGES'; images: PlaceImage[] }
   | { type: 'SET_RECOMMENDATION'; recommendation: Recommendation }
   | { type: 'SUBMIT_ERROR'; error: string }
+  | { type: 'REVISE_START' }
+  | { type: 'REVISE_SUCCESS'; recommendation: Recommendation }
+  | { type: 'REVISE_ERROR'; error: string }
   | { type: 'RESET' };
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -51,6 +56,8 @@ const initialState: State = {
   error: '',
   recommendation: null,
   images: [],
+  revising: false,
+  reviseError: '',
 };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -90,6 +97,12 @@ function reducer(state: State, action: Action): State {
       };
     case 'SUBMIT_ERROR':
       return { ...state, loading: false, error: action.error };
+    case 'REVISE_START':
+      return { ...state, revising: true, reviseError: '' };
+    case 'REVISE_SUCCESS':
+      return { ...state, revising: false, recommendation: action.recommendation };
+    case 'REVISE_ERROR':
+      return { ...state, revising: false, reviseError: action.error };
     case 'RESET':
       return { ...initialState };
     default:
@@ -103,7 +116,8 @@ type ContextValue = {
   state: State;
   dispatch: Dispatch<Action>;
   navigate: (page: Page) => void;
-  submitTrip: () => Promise<void>;
+  submitTrip: (overridePrefs?: Partial<TripPreferences>) => Promise<void>;
+  reviseTrip: (instruction: string) => Promise<void>;
   setRecommendation: (recommendation: Recommendation) => void;
 };
 
@@ -116,10 +130,11 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const setRecommendation = (recommendation: Recommendation) =>
     dispatch({ type: 'SET_RECOMMENDATION', recommendation });
 
-  const submitTrip = async () => {
+  const submitTrip = async (overridePrefs?: Partial<TripPreferences>) => {
     dispatch({ type: 'SUBMIT_START' });
     try {
-      const recommendation = await fetchRecommendation(state.preferences);
+      const finalPrefs = overridePrefs ? { ...state.preferences, ...overridePrefs } : state.preferences;
+      const recommendation = await fetchRecommendation(finalPrefs);
       
       // If AI chose a destination, sync it back to preferences
       if (recommendation.destination && !state.preferences.destination) {
@@ -145,8 +160,20 @@ export function TripProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const reviseTrip = async (instruction: string) => {
+    if (!state.recommendation) return;
+    dispatch({ type: 'REVISE_START' });
+    try {
+      const newRec = await reviseRecommendation(state.preferences, state.recommendation, instruction);
+      dispatch({ type: 'REVISE_SUCCESS', recommendation: newRec });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Revision failed';
+      dispatch({ type: 'REVISE_ERROR', error: msg });
+    }
+  };
+
   return (
-    <TripContext.Provider value={{ state, dispatch, navigate, submitTrip, setRecommendation }}>
+    <TripContext.Provider value={{ state, dispatch, navigate, submitTrip, reviseTrip, setRecommendation }}>
       {children}
     </TripContext.Provider>
   );

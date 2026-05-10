@@ -20,6 +20,7 @@ export default function BookingPage() {
     source: string;
     source_url: string;
     snippet: string;
+    rating: number;
   }>>([]);
   const [loadingTransport, setLoadingTransport] = useState(false);
   const [hotelOptions, setHotelOptions] = useState<Array<{
@@ -30,6 +31,7 @@ export default function BookingPage() {
     source: string;
     source_url: string;
     snippet: string;
+    rating: number;
   }>>([]);
   const [loadingHotels, setLoadingHotels] = useState(false);
 
@@ -217,9 +219,16 @@ export default function BookingPage() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#0c1b33' }}>
-                      {option.mode}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#0c1b33' }}>
+                        {option.mode}
+                      </span>
+                      {option.rating > 0 && (
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '2px 6px', borderRadius: 6 }}>
+                          ★ {option.rating}
+                        </span>
+                      )}
+                    </div>
                     <span style={{ fontWeight: 800, color: option.price_inr ? '#0284c7' : '#64748b' }}>
                       {option.price_inr ? `₹${option.price_inr.toLocaleString('en-IN')}` : 'N/A'}
                     </span>
@@ -270,9 +279,16 @@ export default function BookingPage() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#0c1b33' }}>
-                      {option.destination}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#0c1b33' }}>
+                        {option.provider}
+                      </span>
+                      {option.rating > 0 && (
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '2px 6px', borderRadius: 6 }}>
+                          ★ {option.rating}
+                        </span>
+                      )}
+                    </div>
                     <span style={{ fontWeight: 800, color: option.price_inr ? '#db2777' : '#64748b' }}>
                       {option.price_inr ? `₹${option.price_inr.toLocaleString('en-IN')}` : 'N/A'}
                     </span>

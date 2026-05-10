@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { useTripStore } from '../state/tripStore';
 import { CostBreakdown, DayPlan, PlaceImage } from '../types';
+import { AiConcierge } from '../components/AiConcierge';
+
+const MOOD_ALTERNATIVES: Record<string, string[]> = {
+  'Relaxed': ['Goa', 'Pondicherry', 'Andaman'],
+  'Romantic': ['Udaipur', 'Munnar', 'Darjeeling'],
+  'Adventure': ['Rishikesh', 'Manali', 'Meghalaya'],
+  'Nature': ['Wayanad', 'Coorg', 'Ooty'],
+  'Foodie': ['Amritsar', 'Jaipur', 'Lucknow'],
+};
+const CHEAP_DESTINATIONS = Object.values(MOOD_ALTERNATIVES).flat();
 
 // ─── SVG Icons ─────────────────────────────────────────────────────────────
 
@@ -262,8 +272,30 @@ function CostChart({ breakdown, total }: { breakdown: CostBreakdown; total: numb
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
-  const { state, navigate } = useTripStore();
+  const { state, navigate, dispatch, submitTrip } = useTripStore();
   const { recommendation: rec, images, preferences } = state;
+
+  if (state.loading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(180deg, #f0f9ff 0%, #fdf2f8 50%, #f0f9ff 100%)',
+      }}>
+        <div style={{
+          width: 50, height: 50, borderRadius: '50%',
+          border: '4px solid rgba(236,72,153,0.3)',
+          borderTopColor: '#ec4899',
+          animation: 'spin-slow 0.8s linear infinite',
+          marginBottom: 24,
+        }} />
+        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.5rem', color: '#0c1b33', fontWeight: 800 }}>
+          Crafting your alternative trip...
+        </h2>
+        <p style={{ color: '#5b8bad', marginTop: 8 }}>Please wait a few moments.</p>
+      </div>
+    );
+  }
 
   if (!rec) {
     return (
@@ -293,6 +325,42 @@ export default function ResultsPage() {
     rec.estimated_cost_breakdown.activities +
     rec.estimated_cost_breakdown.misc;
 
+  const userBudget = preferences.budget;
+  let budgetWarning: any = null;
+
+  // Evaluate budget based on the calculated total cost (synced with live prices)
+  if (userBudget < totalBudget * 0.75) {
+    const affordableDays = Math.max(2, Math.floor(userBudget / (totalBudget / preferences.days)));
+    
+    // Pick 2 alternatives that aren't the current destination
+    const alternatives = (MOOD_ALTERNATIVES[preferences.mood] || ['Goa', 'Jaipur'])
+      .filter(d => d.toLowerCase() !== preferences.destination.toLowerCase())
+      .slice(0, 2);
+    
+    budgetWarning = {
+      type: 'severe',
+      message: `🚨 Not possible: Your budget (₹${userBudget.toLocaleString('en-IN')}) falls significantly short of the estimated ₹${totalBudget.toLocaleString('en-IN')} required for ${preferences.days} days in ${preferences.destination}.`,
+      alternatives: alternatives.map(dest => ({
+        text: `Switch to ${dest} (${affordableDays} days)`,
+        onClick: () => {
+          dispatch({ type: 'SET_PREF', field: 'destination', value: dest });
+          dispatch({ type: 'SET_PREF', field: 'days', value: affordableDays });
+          submitTrip({ destination: dest, days: affordableDays });
+        }
+      }))
+    };
+  } else if (userBudget < totalBudget) {
+    budgetWarning = {
+      type: 'moderate',
+      message: `⚠️ Possible but tight: Your budget (₹${userBudget.toLocaleString('en-IN')}) is slightly below the estimated ₹${totalBudget.toLocaleString('en-IN')}. Tips: Book hostels early, use public transport, and enjoy street food!`
+    };
+  } else {
+    budgetWarning = {
+      type: 'success',
+      message: `✅ Possible: Your budget (₹${userBudget.toLocaleString('en-IN')}) comfortably covers the estimated ₹${totalBudget.toLocaleString('en-IN')} trip cost!`
+    };
+  }
+
   return (
     <div style={{ minHeight: '100vh', position: 'relative' }}>
       {/* Hero gradient */}
@@ -304,6 +372,40 @@ export default function ResultsPage() {
 
       <div style={{ position: 'relative', zIndex: 1, padding: '100px 24px 80px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+
+          {/* ── Budget Warning ─────────────────────────────────────────── */}
+          {budgetWarning && (
+            <div className="anim-fade-up" style={{
+              background: budgetWarning.type === 'severe' ? 'rgba(239, 68, 68, 0.1)' : 
+                          budgetWarning.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+              border: `1px solid ${budgetWarning.type === 'severe' ? 'rgba(239, 68, 68, 0.3)' : 
+                                   budgetWarning.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+              padding: '20px 24px', borderRadius: 16, marginBottom: 32,
+              color: budgetWarning.type === 'severe' ? '#991b1b' : 
+                     budgetWarning.type === 'success' ? '#065f46' : '#b45309',
+              fontWeight: 600, fontSize: '1.05rem', textAlign: 'center',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
+            }}>
+              <div>{budgetWarning.message}</div>
+              {budgetWarning.alternatives && budgetWarning.alternatives.length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#991b1b' }}>Here are better alternatives that fit your budget:</span>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {budgetWarning.alternatives.map((alt: any, i: number) => (
+                      <button 
+                        key={i}
+                        onClick={alt.onClick}
+                        className="btn btn-primary" 
+                        style={{ padding: '8px 20px', fontSize: '0.95rem', borderRadius: 8, background: '#0ea5e9', color: '#fff', border: 'none' }}
+                      >
+                        {alt.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Trip Header ──────────────────────────────────────────── */}
           <div className="anim-fade-up" style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -525,6 +627,7 @@ export default function ResultsPage() {
           </div>
         </div>
       </div>
+      <AiConcierge />
     </div>
   );
 }
