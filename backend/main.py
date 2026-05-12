@@ -9,7 +9,12 @@ import re
 import datetime
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-import ollama
+try:
+    import ollama
+    HAS_OLLAMA = True
+except ImportError:
+    HAS_OLLAMA = False
+    print("[WARN] ollama package not installed — Ollama endpoints will be unavailable.")
 import requests
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -624,6 +629,8 @@ async def collaboration_endpoint(websocket: WebSocket, session_id: str):
 
 def is_ollama_available() -> bool:
     """Check if local Ollama instance is responsive."""
+    if not HAS_OLLAMA:
+        return False
     try:
         # Pinging tags is a lightweight way to check health
         ollama.list()
