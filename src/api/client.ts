@@ -1,6 +1,6 @@
 import { PlaceImage, Recommendation, TripPreferences } from '../types';
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export async function fetchRecommendation(prefs: TripPreferences): Promise<Recommendation> {
   const res = await fetch(`${BASE}/recommend`, {

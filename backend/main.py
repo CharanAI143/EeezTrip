@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 import ollama
 import requests
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 load_dotenv()
 
@@ -82,15 +83,21 @@ app = FastAPI(title="EeezTrip API", version="2.0.0", lifespan=lifespan)
 LOCAL_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:31b-cloud").strip() or "gemma4:31b-cloud"
 DEEP_MODE_TIMEOUT_SEC = int(os.getenv("DEEP_MODE_TIMEOUT_SEC", "12"))
 
+# Gemini Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
 try:
     import multipart  # type: ignore # noqa: F401
     HAS_MULTIPART = True
 except Exception:
     HAS_MULTIPART = False
 
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -586,6 +593,86 @@ def get_hotel_prices(
     return results
 
 
+
+# ─── AI Orchestration Layer ──────────────────────────────────────────────────
+
+def is_ollama_available() -> bool:
+    """Check if local Ollama instance is responsive."""
+    try:
+        # Pinging tags is a lightweight way to check health
+        ollama.list()
+        return True
+    except Exception:
+        return False
+
+def gemini_generate_trip(req: TripRequest) -> TripResponse:
+    """Fallback generator using Google Gemini."""
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not configured for fallback.")
+    
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    date_context = f"from {req.start_date} to {req.end_date}" if req.start_date and req.end_date else ""
+    
+    prompt = f"""You are an expert luxury travel planner. Create a {req.days}-day trip {date_context}.
+Origin: {req.origin or 'Not set'}
+Destination: {req.destination or 'Pick the best based on mood'}
+Mood: {req.mood}
+Budget: ₹{req.budget:,} INR
+
+Return a valid JSON object matching this schema exactly:
+{{
+  "destination": "string",
+  "title": "string",
+  "tagline": "string",
+  "summary": "string",
+  "best_time": "string",
+  "highlights": ["string", "string", "string"],
+  "daily_plan": [
+    {{
+      "day": 1,
+      "title": "string",
+      "morning": "string",
+      "midday": "string",
+      "afternoon": "string",
+      "evening": "string",
+      "tip": "string"
+    }}
+  ],
+  "cozy_tips": ["string", "string", "string"],
+  "must_try_food": ["string", "string", "string"],
+  "estimated_cost_breakdown": {{
+    "accommodation": integer,
+    "food": integer,
+    "transport": integer,
+    "activities": integer,
+    "misc": integer
+  }}
+}}
+Rules:
+1. JSON ONLY, no markdown.
+2. cost_breakdown must sum to {req.budget}.
+"""
+    response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+    data = json.loads(response.text)
+    return TripResponse(**data)
+
+def gemini_chat(messages: List[ChatMessage]) -> str:
+    """Fallback chat using Google Gemini."""
+    if not GEMINI_API_KEY:
+        return "I'm sorry, I'm having trouble connecting to my AI services right now."
+    
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    
+    # Simple conversion of messages to Gemini format
+    system_instruction = "You are EeezTrip's travel assistant. Keep answers concise, practical, and friendly."
+    full_prompt = f"System Instruction: {system_instruction}\n\n"
+    for m in messages[-5:]:
+        full_prompt += f"{m.role}: {m.content}\n"
+    
+    response = model.generate_content(full_prompt)
+    return response.text.strip()
+
+
 def ollama_generate_trip(req: TripRequest) -> TripResponse:
     date_context = ""
     if req.start_date and req.end_date:
@@ -965,14 +1052,32 @@ Rules:
 def recommend_trip(req: TripRequest):
     trip = None
     if req.mode == "deep":
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(ollama_generate_trip, req)
+        # Orchestration logic: Try Ollama first, fallback to Gemini
+        if is_ollama_available():
             try:
-                trip = future.result(timeout=DEEP_MODE_TIMEOUT_SEC)
-            except FuturesTimeoutError:
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(ollama_generate_trip, req)
+                    trip = future.result(timeout=DEEP_MODE_TIMEOUT_SEC)
+            except Exception as e:
+                print(f"Ollama deep generation failed, falling back to Gemini: {e}")
+                if GEMINI_API_KEY:
+                    try:
+                        trip = gemini_generate_trip(req)
+                    except Exception as ge:
+                        print(f"Gemini fallback failed: {ge}")
+                        trip = build_fast_trip(req)
+                else:
+                    trip = build_fast_trip(req)
+        elif GEMINI_API_KEY:
+            print("Ollama unavailable, using Gemini for deep mode.")
+            try:
+                trip = gemini_generate_trip(req)
+            except Exception as e:
+                print(f"Gemini generation failed: {e}")
                 trip = build_fast_trip(req)
-            except Exception:
-                trip = build_fast_trip(req)
+        else:
+            print("No AI services available, using template generator.")
+            trip = build_fast_trip(req)
     else:
         trip = build_fast_trip(req)
 
@@ -1002,7 +1107,18 @@ def recommend_trip(req: TripRequest):
 def chat(req: ChatRequest):
     if not req.messages:
         raise HTTPException(status_code=400, detail="At least one chat message is required.")
-    reply = ollama_chat(req.messages)
+    
+    # Orchestration logic for Chat
+    if is_ollama_available():
+        reply = ollama_chat(req.messages)
+        # If ollama returned a fallback message, we might want to try Gemini instead
+        if "I could not reach the AI model" in reply and GEMINI_API_KEY:
+             reply = gemini_chat(req.messages)
+    elif GEMINI_API_KEY:
+        reply = gemini_chat(req.messages)
+    else:
+        reply = "I'm currently in offline mode. I can help with basic navigation, but full AI chat is unavailable."
+        
     return ChatResponse(reply=reply)
 
 
