@@ -114,13 +114,19 @@ class TripRequest(BaseModel):
     mood: str = "Relaxed"
     budget: int = 50000
     days: int = 4
+    start_date: str = Field("", alias="startDate")
+    end_date: str = Field("", alias="endDate")
     mode: str = "normal"
+
+    class Config:
+        populate_by_name = True
 
 
 class DayPlan(BaseModel):
     day: int
     title: str
     morning: str
+    midday: str
     afternoon: str
     evening: str
     tip: str
@@ -161,6 +167,7 @@ class WeatherResponse(BaseModel):
     temperature_min: float
     condition: str
     is_day: int = 1
+    needs_alternatives: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -193,6 +200,11 @@ class BookingRequest(BaseModel):
     trip_id: str = ""
     destination: str
     check_in: str
+
+class AlternativePlanRequest(BaseModel):
+    destination: str
+    condition: str
+    mood: str
     check_out: str
     guests: int = 1
     hotel: str = ""
@@ -327,33 +339,33 @@ def _mood_data(mood: str) -> dict:
     })
 
 
-def _build_daily_plan(destination: str, mood_key: str, days: int) -> List[DayPlan]:
+def _build_daily_plan(destination: str, mood_key: str, days: int, start_date: str = "") -> List[DayPlan]:
     md = _mood_data(mood_key)
     plan = []
 
     morning_activities = [
-        f"a sunrise viewpoint overlooking {destination}",
-        f"the historic old quarter of {destination}",
-        f"a scenic waterfront walk in {destination}",
-        f"the famous central park area of {destination}",
-        f"a local neighborhood market in {destination}",
-        f"the heritage museum district of {destination}",
+        f"visit the sunrise viewpoint overlooking {destination}",
+        f"explore the historic architecture in the old quarter of {destination}",
+        f"take a peaceful morning walk along the waterfront of {destination}",
+        f"jog through the scenic trails of {destination}'s central park",
+        f"sample local breakfast at a hidden neighborhood market in {destination}",
+        f"browse the early exhibitions at the heritage museum of {destination}",
     ]
     afternoon_spots = [
-        f"the iconic landmarks of {destination}",
-        f"a cultural heritage site near {destination}",
-        f"the artisan craft quarter of {destination}",
-        f"scenic gardens and botanical walks in {destination}",
-        f"a lake or river promenade in {destination}",
-        f"the vibrant bazaar streets of {destination}",
+        f"discover the intricate details of {destination}'s iconic landmarks",
+        f"uncover the ancient stories at a cultural heritage site near {destination}",
+        f"watch local artisans at work in the craft quarter of {destination}",
+        f"photograph the rare blooms in the botanical gardens of {destination}",
+        f"relax on a private boat tour along the river in {destination}",
+        f"hunt for unique treasures in the vibrant bazaar of {destination}",
     ]
     evening_places = [
-        f"a rooftop bar with city views of {destination}",
-        f"the famous night market of {destination}",
-        f"a riverside dining spot in {destination}",
-        f"the old town square of {destination}",
-        f"a locally-loved restaurant serving {destination} specialties",
-        f"a hilltop café overlooking {destination}",
+        f"sip cocktails at a premier rooftop bar with views of {destination}",
+        f"experience the energy of {destination}'s famous night market",
+        f"enjoy a candlelit dinner at a riverside spot in {destination}",
+        f"people-watch from a cozy café in {destination}'s old town square",
+        f"feast on traditional {destination} specialties at a legendary restaurant",
+        f"watch the city lights from a quiet hilltop café near {destination}",
     ]
     day_titles = [
         f"Arrival & First Impressions",
@@ -372,12 +384,25 @@ def _build_daily_plan(destination: str, mood_key: str, days: int) -> List[DayPla
         f"Farewell Day",
     ]
 
+    current_date = None
+    if start_date:
+        try:
+            current_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        except:
+            pass
+
     for i in range(1, days + 1):
+        date_str = ""
+        if current_date:
+            date_str = (current_date + datetime.timedelta(days=i-1)).strftime("%b %d")
+            
+        title_prefix = f"{date_str}: " if date_str else ""
         if i == 1:
             day = DayPlan(
                 day=i,
                 title="Arrival & First Impressions",
                 morning=f"Arrive in {destination}, check into your stay, and freshen up.",
+                midday="Quick lunch at a nearby local eatery to get your first taste of the city.",
                 afternoon=f"{md['afternoon_prefix']} {afternoon_spots[i % len(afternoon_spots)]} for an easy first explore.",
                 evening=f"Welcome dinner at {evening_places[i % len(evening_places)]}.",
                 tip="Don't over-schedule your arrival day — let the city meet you slowly.",
@@ -387,6 +412,7 @@ def _build_daily_plan(destination: str, mood_key: str, days: int) -> List[DayPla
                 day=i,
                 title="Farewell & Last Flavors",
                 morning=f"Slow breakfast, last-minute souvenir shopping in {destination}.",
+                midday="Enjoy a final leisurely lunch at your favorite local spot.",
                 afternoon=f"Final wander through your favorite spot in {destination}.",
                 evening=f"Head to the airport or station — {destination} will miss you.",
                 tip="Photograph the small things — doorways, menus, street signs. They tell the real story.",
@@ -395,8 +421,9 @@ def _build_daily_plan(destination: str, mood_key: str, days: int) -> List[DayPla
             idx = (i - 1) % len(morning_activities)
             day = DayPlan(
                 day=i,
-                title=day_titles[min(i - 1, len(day_titles) - 1)],
+                title=f"{title_prefix}{day_titles[min(i - 1, len(day_titles) - 1)]}",
                 morning=f"{md['morning_prefix']} {morning_activities[idx]}.",
+                midday=f"Lunch at a locally-recommended spot near {morning_activities[idx].split(' ')[-1]}.",
                 afternoon=f"{md['afternoon_prefix']} {afternoon_spots[idx]}.",
                 evening=f"{md['evening_prefix']} {evening_places[idx]}.",
                 tip=md["day_tip"],
@@ -560,32 +587,39 @@ def get_hotel_prices(
 
 
 def ollama_generate_trip(req: TripRequest) -> TripResponse:
+    date_context = ""
+    if req.start_date and req.end_date:
+        date_context = f"The trip is from {req.start_date} to {req.end_date}. "
+    elif req.start_date:
+        date_context = f"The trip starts on {req.start_date}. "
+
     prompt = f"""You are an expert luxury travel planner. The user wants a {req.days}-day trip from {req.origin or 'their location'}.
-Their mood/style is {req.mood} and their total budget is ₹{req.budget:,} INR.
+{date_context}Their mood/style is {req.mood} and their total budget is ₹{req.budget:,} INR.
 
 {f"The destination is {req.destination}." if req.destination else "Please choose the PERFECT destination for them based on their mood and budget!"}
 
-Generate a detailed, highly curated itinerary. 
+Generate a detailed, authentic, and immersive itinerary. 
 You MUST respond with a valid JSON object matching this schema perfectly:
 {{
   "destination": "string (The chosen destination name, e.g. 'Bali')",
-  "title": "string (Catchy title)",
+  "title": "string (Catchy, authentic title)",
   "tagline": "string (Short evocative tagline)",
   "summary": "string (A paragraph summarizing the trip, referencing origin, destination, mood, and budget)",
-  "best_time": "string (Best time of year to visit)",
+  "best_time": "string (Best time of year to visit, considering seasons and weather)",
   "highlights": ["string", "string", "string"],
   "daily_plan": [
     {{
       "day": 1,
-      "title": "string",
-      "morning": "string",
-      "afternoon": "string",
-      "evening": "string",
-      "tip": "string"
+      "title": "string (Descriptive title for the day's theme)",
+      "morning": "string (6:00 AM - 11:30 AM: Specific place, activity, duration, and why it's worth it)",
+      "midday": "string (11:30 AM - 2:30 PM: Lunch at a specific restaurant/area, activity, and travel time if any)",
+      "afternoon": "string (2:30 PM - 6:00 PM: Specific place, activity, duration, and practical details like opening hours)",
+      "evening": "string (6:00 PM - 10:00 PM: Dinner and leisure activity at a specific location, authentic local experience)",
+      "tip": "string (Insider tip, reservation advice, or advance booking recommendation)"
     }}
   ],
-  "cozy_tips": ["string", "string", "string"],
-  "must_try_food": ["string", "string", "string"],
+  "cozy_tips": ["string (Practical travel details)", "string", "string"],
+  "must_try_food": ["string (Local delicacies with brief description)", "string", "string"],
   "estimated_cost_breakdown": {{
     "accommodation": integer,
     "food": integer,
@@ -595,10 +629,14 @@ You MUST respond with a valid JSON object matching this schema perfectly:
   }}
 }}
 
-Important rules:
-1. ONLY return the JSON object, absolutely no markdown formatting, no code blocks, no extra text.
-2. The values in estimated_cost_breakdown MUST sum up to exactly {req.budget} and MUST be integers (Indian Rupees).
-3. For the transport budget, estimate for a ROUND TRIP (both ways). Only include flight expenses if the origin and destination are in completely different nations. Otherwise, prioritize ground transport.
+Important Planning Rules:
+1. SPECIFICITY: Use actual place names, landmarks, and restaurants. No generic descriptions.
+2. TIMING: Include specific time ranges (e.g., 9:00 AM - 12:00 PM) for each block.
+3. LOGIC: Minimize travel time between locations. Ensure a logical geographic flow to avoid backtracking.
+4. VARIETY: Mix popular highlights with genuine local gems. Balance active exploration with rest.
+5. PRACTICALITY: Mention estimated durations, travel times, and advance booking needs where relevant.
+6. FORMAT: ONLY return the JSON object, no extra text or markdown code blocks.
+7. BUDGET: Values in estimated_cost_breakdown MUST sum to exactly {req.budget} (integers).
 """
     try:
         model = resolve_ollama_model(LOCAL_OLLAMA_MODEL)
@@ -705,7 +743,7 @@ def build_fast_trip(req: TripRequest) -> TripResponse:
         "Rich local culture and cuisine",
         "Unforgettable scenic views",
     ])
-    daily_plan = _build_daily_plan(destination, mood_key, days)
+    daily_plan = _build_daily_plan(destination, mood_key, days, req.start_date)
     cost_breakdown = _build_cost_breakdown(req.budget, mood_key)
     food_list = FOOD_BY_DESTINATION_MOOD.get(mood_key, [
         f"Signature {destination} street food",
@@ -789,7 +827,10 @@ def scrape_transport_price(origin: str, destination: str, mode: str) -> Transpor
                         rating=mock_rating,
                     )
         except Exception as e:
-            print(f"SerpApi transport error: {e}")
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
+                print("SerpApi key unauthorized for transport. Using mock data.")
+            else:
+                print(f"SerpApi transport error: {e}")
             
     # Fallback to mock price
     return TransportOption(
@@ -842,7 +883,10 @@ def scrape_hotel_price(destination: str) -> HotelOption:
                         rating=mock_rating,
                     )
         except Exception as e:
-            print(f"SerpApi hotel error: {e}")
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
+                print("SerpApi key unauthorized for hotel. Using mock data.")
+            else:
+                print(f"SerpApi hotel error: {e}")
 
     # Fallback to mock price
     return HotelOption(
@@ -1039,34 +1083,82 @@ def get_weather(place: str = Query(..., min_length=2)):
         is_day = current.get("is_day", 1)
         
         condition = "Clear"
+        needs_alternatives = False
         if code in [1, 2, 3]:
             condition = "Partly cloudy" if code == 1 else "Cloudy"
         elif code in [45, 48]:
             condition = "Foggy"
+            needs_alternatives = True
         elif code in [51, 53, 55, 56, 57]:
             condition = "Drizzle"
+            needs_alternatives = True
         elif code in [61, 63, 65, 66, 67]:
             condition = "Rain"
+            needs_alternatives = True
         elif code in [71, 73, 75, 77]:
             condition = "Snow"
+            needs_alternatives = True
         elif code in [80, 81, 82]:
             condition = "Showers"
+            needs_alternatives = True
         elif code in [95, 96, 99]:
             condition = "Thunderstorm"
-            
+            needs_alternatives = True
+        
+        # Also check for extreme temperatures (e.g., > 38C or < -5C)
         temp_max = daily.get("temperature_2m_max", [0])[0] if daily.get("temperature_2m_max") else current.get("temperature_2m", 0)
         temp_min = daily.get("temperature_2m_min", [0])[0] if daily.get("temperature_2m_min") else current.get("temperature_2m", 0)
+        
+        if temp_max > 38 or temp_min < -10:
+            needs_alternatives = True
 
         return {
             "temperature_max": temp_max,
             "temperature_min": temp_min,
             "condition": condition,
-            "is_day": is_day
+            "is_day": is_day,
+            "needs_alternatives": needs_alternatives
         }
     except Exception as e:
         print(f"Weather error: {e}")
         return {"temperature_max": 26.0, "temperature_min": 18.0, "condition": "Sunny", "is_day": 1}
 
+
+@app.post("/api/weather/alternatives")
+def get_weather_alternatives(req: AlternativePlanRequest):
+    """Suggest alternative indoor/safe activities based on bad weather."""
+    prompt = f"""The user is in {req.destination} with a '{req.mood}' travel style.
+However, the weather is currently '{req.condition}' (unfavorable).
+Suggest 3-4 specific indoor or weather-safe alternative activities they can do instead of outdoor plans.
+Keep the suggestions aligned with their '{req.mood}' vibe if possible.
+Return a simple JSON list of strings under the key 'alternatives'."""
+
+    try:
+        # Use Ollama for the suggestion
+        response = ollama.chat(
+            model="llama3",
+            messages=[{"role": "user", "content": prompt}],
+            format="json"
+        )
+        content = response["message"]["content"]
+        # Basic cleanup in case of markdown blocks
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+            
+        return json.loads(content)
+    except Exception as e:
+        print(f"Alternatives error: {e}")
+        # Generic fallbacks
+        return {
+            "alternatives": [
+                f"Explore the local museums and art galleries in {req.destination}",
+                "Find a cozy boutique café or a historic library to unwind",
+                "Visit a local indoor market or shopping arcade",
+                "Treat yourself to a spa day or indoor wellness center"
+            ]
+        }
 
 # ─── MongoDB CRUD Endpoints ───────────────────────────────────────────────────
 

@@ -7,6 +7,8 @@ export type TripPreferences = {
   mood: string;
   budget: number;
   days: number;
+  startDate: string;
+  endDate: string;
   mode: 'normal' | 'deep';
 };
 
@@ -16,6 +18,8 @@ export type TripRequest = {
   mood: string;
   budget: number;
   days: number;
+  startDate: string;
+  endDate: string;
   mode: 'normal' | 'deep';
 };
 
@@ -25,6 +29,7 @@ export type DayPlan = {
   day: number;
   title: string;
   morning: string;
+  midday: string;
   afternoon: string;
   evening: string;
   tip: string;

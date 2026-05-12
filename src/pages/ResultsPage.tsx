@@ -6,6 +6,8 @@ import { ShareExport } from '../components/ShareExport';
 import { WeatherWidget } from '../components/WeatherWidget';
 import { Icons } from '../components/Icons';
 import { MapWidget } from '../components/MapWidget';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { WeatherAdvisory } from '../components/WeatherAdvisory';
 
 const MOOD_ALTERNATIVES: Record<string, string[]> = {
   'Relaxed': ['Goa', 'Pondicherry', 'Andaman'],
@@ -142,6 +144,9 @@ function DayCard({ day }: { day: DayPlan }) {
           <div style={{ paddingTop: 20, display: 'grid', gap: 20 }}>
             {[
               { time: 'Morning', text: day.morning, color: '#f97316', icon: Icons.morning },
+              { time: 'Midday', text: day.midday, color: '#f59e0b', icon: (
+                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M3 12h2.25m.386-6.364l1.591 1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12a6.75 6.75 0 1113.5 0 6.75 6.75 0 01-13.5 0z" /></svg>
+              ) },
               { time: 'Afternoon', text: day.afternoon, color: '#0ea5e9', icon: Icons.afternoon },
               { time: 'Evening', text: day.evening, color: '#8b5cf6', icon: Icons.evening },
             ].map(slot => (
@@ -276,6 +281,36 @@ export default function ResultsPage() {
     );
   }
 
+  if (state.error) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '100px 24px', textAlign: 'center',
+      }}>
+        <div style={{ color: '#ef4444', marginBottom: 24 }}>
+          <svg width="64" height="64" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.8rem', fontWeight: 800, color: '#0c1b33', marginBottom: 12 }}>
+          Generation Failed
+        </h2>
+        <p style={{ color: '#ef4444', marginBottom: 32, fontSize: '1.1rem', maxWidth: 500, fontWeight: 600 }}>
+          {state.error}
+        </p>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <button className="btn btn-primary" onClick={() => navigate('preferences')} style={{ borderRadius: 999, padding: '14px 32px' }}>
+            Try Again
+          </button>
+          <button className="btn btn-outline" onClick={() => navigate('start')} style={{ borderRadius: 999, padding: '14px 32px' }}>
+            New Search
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!rec) {
     return (
       <div style={{
@@ -297,28 +332,44 @@ export default function ResultsPage() {
     );
   }
 
-  const totalBudget =
-    rec.estimated_cost_breakdown.accommodation +
-    rec.estimated_cost_breakdown.food +
-    rec.estimated_cost_breakdown.transport +
-    rec.estimated_cost_breakdown.activities +
-    rec.estimated_cost_breakdown.misc;
+  // Defensive array checks
+  const highlights = Array.isArray(rec.highlights) ? rec.highlights : [];
+  const dailyPlan = Array.isArray(rec.daily_plan) ? rec.daily_plan : [];
+  const mustTryFood = Array.isArray(rec.must_try_food) ? rec.must_try_food : [];
+  const cozyTips = Array.isArray(rec.cozy_tips) ? rec.cozy_tips : [];
 
-  const userBudget = preferences.budget;
+  // Safe access to estimated cost breakdown
+  const breakdown = rec.estimated_cost_breakdown || {
+    accommodation: 0,
+    food: 0,
+    transport: 0,
+    activities: 0,
+    misc: 0
+  };
+
+  const totalCost =
+    breakdown.accommodation +
+    breakdown.food +
+    breakdown.transport +
+    breakdown.activities +
+    breakdown.misc;
+
+  const userBudget = preferences?.budget || 0;
+  const currentDest = preferences?.destination || rec.destination || '';
   let budgetWarning: any = null;
 
   // Evaluate budget based on the calculated total cost (synced with live prices)
-  if (userBudget < totalBudget * 0.75) {
-    const affordableDays = Math.max(2, Math.floor(userBudget / (totalBudget / preferences.days)));
+  if (userBudget < totalCost * 0.75) {
+    const affordableDays = Math.max(2, Math.floor(userBudget / (totalCost / (preferences?.days || 5))));
     
     // Pick 2 alternatives that aren't the current destination
-    const alternatives = (MOOD_ALTERNATIVES[preferences.mood] || ['Goa', 'Jaipur'])
-      .filter(d => d.toLowerCase() !== preferences.destination.toLowerCase())
+    const alternatives = (MOOD_ALTERNATIVES[preferences?.mood || 'Relaxed'] || ['Goa', 'Jaipur'])
+      .filter(d => d.toLowerCase() !== currentDest.toLowerCase())
       .slice(0, 2);
     
     budgetWarning = {
       type: 'severe',
-      message: `🚨 Not possible: Your budget (₹${userBudget.toLocaleString('en-IN')}) falls significantly short of the estimated ₹${totalBudget.toLocaleString('en-IN')} required for ${preferences.days} days in ${preferences.destination}.`,
+      message: `🚨 Not possible: Your budget (₹${userBudget.toLocaleString('en-IN')}) falls significantly short of the estimated ₹${totalCost.toLocaleString('en-IN')} required for ${preferences?.days || 5} days in ${currentDest}.`,
       alternatives: alternatives.map(dest => ({
         text: `Switch to ${dest} (${affordableDays} days)`,
         onClick: () => {
@@ -328,15 +379,15 @@ export default function ResultsPage() {
         }
       }))
     };
-  } else if (userBudget < totalBudget) {
+  } else if (userBudget < totalCost) {
     budgetWarning = {
       type: 'moderate',
-      message: `⚠️ Possible but tight: Your budget (₹${userBudget.toLocaleString('en-IN')}) is slightly below the estimated ₹${totalBudget.toLocaleString('en-IN')}. Tips: Book hostels early, use public transport, and enjoy street food!`
+      message: `⚠️ Possible but tight: Your budget (₹${userBudget.toLocaleString('en-IN')}) is slightly below the estimated ₹${totalCost.toLocaleString('en-IN')}. Tips: Book hostels early, use public transport, and enjoy street food!`
     };
   } else {
     budgetWarning = {
       type: 'success',
-      message: `✅ Possible: Your budget (₹${userBudget.toLocaleString('en-IN')}) comfortably covers the estimated ₹${totalBudget.toLocaleString('en-IN')} trip cost!`
+      message: `✅ Possible: Your budget (₹${userBudget.toLocaleString('en-IN')}) comfortably covers the estimated ₹${totalCost.toLocaleString('en-IN')} trip cost!`
     };
   }
 
@@ -392,15 +443,19 @@ export default function ResultsPage() {
                 {Icons.checkReady} Trip Ready
               </span>
               <span className="badge badge-pink" style={{ padding: '6px 14px' }}>
-                {preferences.mood} · {preferences.days} days
+                {preferences?.mood || 'Relaxed'} · {preferences?.days || 4} days
               </span>
-              <WeatherWidget destination={rec.destination || preferences.destination} />
+              <ErrorBoundary fallback={<div style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.7)', borderRadius: 999, fontSize: '0.85rem' }}>Weather unavailable</div>}>
+                <WeatherWidget destination={rec.destination || (preferences && preferences.destination) || ''} />
+              </ErrorBoundary>
             </div>
 
             {/* Share & Export Buttons */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
               <ShareExport rec={rec} preferences={preferences} />
             </div>
+
+            <WeatherAdvisory destination={rec.destination || (preferences && preferences.destination) || ''} mood={preferences?.mood || 'Relaxed'} />
 
             <h1 style={{
               fontFamily: 'Outfit, sans-serif',
@@ -434,10 +489,10 @@ export default function ResultsPage() {
             marginBottom: 40, overflow: 'hidden',
             boxShadow: '0 8px 30px rgba(12, 27, 51, 0.04)'
           }}>
-            {rec.highlights.map((h, i) => (
+            {highlights.map((h, i) => (
               <div key={i} style={{
                 flex: '1 1 200px', padding: '24px', textAlign: 'center',
-                borderRight: i < rec.highlights.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
+                borderRight: i < highlights.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
               }}>
                 <div style={{ color: '#38bdf8', marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
                   {i === 0 ? <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg> : 
@@ -460,7 +515,7 @@ export default function ResultsPage() {
                 display: 'flex', alignItems: 'center', gap: 10,
               }}>
                 <span style={{ color: '#0ea5e9' }}>{Icons.camera}</span>
-                <span className="text-gradient-ice">{preferences.destination}</span> in Photos
+                <span className="text-gradient-ice">{preferences?.destination || rec.destination}</span> in Photos
               </h2>
               <ImageGallery images={images} />
             </div>
@@ -483,7 +538,7 @@ export default function ResultsPage() {
                 <span style={{ color: '#8b5cf6' }}>{Icons.map}</span>
                 Day-by-Day Itinerary
               </h2>
-              {rec.daily_plan.map(day => (
+              {dailyPlan.map(day => (
                 <DayCard key={day.day} day={day} />
               ))}
             </div>
@@ -492,9 +547,11 @@ export default function ResultsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               
               {/* Interactive Map */}
-              <div className="anim-fade-up delay-400" style={{ height: 350, zIndex: 10 }}>
-                <MapWidget destination={rec.destination} />
-              </div>
+              <ErrorBoundary fallback={<div style={{ height: 350, background: '#f8fafc', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>Interactive map unavailable</div>}>
+                <div className="anim-fade-up delay-400" style={{ height: 350, zIndex: 10 }}>
+                  <MapWidget destination={rec.destination || (preferences && preferences.destination) || ''} />
+                </div>
+              </ErrorBoundary>
 
               {/* Best time */}
               <div className="glass anim-fade-up delay-300" style={{ padding: '24px', boxShadow: '0 8px 30px rgba(12, 27, 51, 0.04)' }}>
@@ -520,7 +577,7 @@ export default function ResultsPage() {
                   <span style={{ color: '#ec4899' }}>{Icons.food}</span> Must-Try Culinary
                 </h3>
                 <div style={{ display: 'grid', gap: 10 }}>
-                  {rec.must_try_food.map((food, i) => (
+                  {mustTryFood.map((food, i) => (
                     <div key={i} style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10,
                       padding: '10px 14px',
@@ -546,7 +603,7 @@ export default function ResultsPage() {
                   <span style={{ color: '#f97316' }}>{Icons.lightbulb}</span> Insider Tips
                 </h3>
                 <div style={{ display: 'grid', gap: 14 }}>
-                  {rec.cozy_tips.map((tip, i) => (
+                  {cozyTips.map((tip, i) => (
                     <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                       <span style={{
                         width: 24, height: 24, borderRadius: '50%',
@@ -573,7 +630,7 @@ export default function ResultsPage() {
                 }}>
                   <span style={{ color: '#22c55e' }}>{Icons.wallet}</span> Budget Breakdown
                 </h3>
-                <CostChart breakdown={rec.estimated_cost_breakdown} total={totalBudget} />
+                <CostChart breakdown={breakdown} total={totalCost} />
               </div>
             </div>
           </div>

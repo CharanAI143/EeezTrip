@@ -1786,5 +1786,123 @@
         "source": "wikimedia"
       }
     ]
+  },
+  "costa rica": {
+    "place": "Costa Rica",
+    "state": "",
+    "images": [
+      {
+        "image_id": "commons-167219381",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Etlingera_elatior%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Costa Rica, Limón, Veragua Rainforest (Etlingera elatior).jpg",
+        "author": "Dr. Thomas Liptak",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Dr. Thomas Liptak",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Costa Rica, Limón, Veragua Rainforest (Etlingera elatior).jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-167219393",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg/1280px-Costa_Rica%2C_Lim%C3%B3n%2C_Veragua_Rainforest_%28Trichonephila_clavipes%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Costa Rica, Limón, Veragua Rainforest (Trichonephila clavipes).jpg",
+        "author": "Dr. Thomas Liptak",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Dr. Thomas Liptak",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Costa Rica, Limón, Veragua Rainforest (Trichonephila clavipes).jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-42684885",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Costa_Rica_1897_20_Colones_%28proof%29.jpg/1280px-Costa_Rica_1897_20_Colones_%28proof%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/9/98/Costa_Rica_1897_20_Colones_%28proof%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/9/98/Costa_Rica_1897_20_Colones_%28proof%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Costa_Rica_1897_20_Colones_%28proof%29.jpg/1280px-Costa_Rica_1897_20_Colones_%28proof%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Costa_Rica_1897_20_Colones_%28proof%29.jpg/1280px-Costa_Rica_1897_20_Colones_%28proof%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Costa_Rica_1897_20_Colones_%28proof%29.jpg/1280px-Costa_Rica_1897_20_Colones_%28proof%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Costa Rica 1897 20 Colones (proof).jpg",
+        "author": "Godot13",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Godot13",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Costa Rica 1897 20 Colones (proof).jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-79651124",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Costa_Rican_skipper_%28Halotus_rica%29.jpg/1280px-Costa_Rican_skipper_%28Halotus_rica%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/9/97/Costa_Rican_skipper_%28Halotus_rica%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/9/97/Costa_Rican_skipper_%28Halotus_rica%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Costa_Rican_skipper_%28Halotus_rica%29.jpg/1280px-Costa_Rican_skipper_%28Halotus_rica%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Costa_Rican_skipper_%28Halotus_rica%29.jpg/1280px-Costa_Rican_skipper_%28Halotus_rica%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Costa_Rican_skipper_%28Halotus_rica%29.jpg/1280px-Costa_Rican_skipper_%28Halotus_rica%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Costa Rican skipper (Halotus rica).jpg",
+        "author": "Charlesjsharp",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Charlesjsharp",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Costa Rican skipper (Halotus rica).jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-146957863",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Eugenes_fulgens_in_Costa_Rica_01.jpg/1280px-Eugenes_fulgens_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/3/31/Eugenes_fulgens_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/3/31/Eugenes_fulgens_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Eugenes_fulgens_in_Costa_Rica_01.jpg/1280px-Eugenes_fulgens_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Eugenes_fulgens_in_Costa_Rica_01.jpg/1280px-Eugenes_fulgens_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Eugenes_fulgens_in_Costa_Rica_01.jpg/1280px-Eugenes_fulgens_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Eugenes fulgens in Costa Rica 01.jpg",
+        "author": "Bgag",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Bgag",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Eugenes fulgens in Costa Rica 01.jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-146891889",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Eugenes_spectabilis_in_Costa_Rica_01.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/6/6c/Eugenes_spectabilis_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/6/6c/Eugenes_spectabilis_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Eugenes_spectabilis_in_Costa_Rica_01.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Eugenes_spectabilis_in_Costa_Rica_01.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Eugenes_spectabilis_in_Costa_Rica_01.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Eugenes spectabilis in Costa Rica 01.jpg",
+        "author": "Bgag",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Bgag",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Eugenes spectabilis in Costa Rica 01.jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-146891891",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Eugenes_spectabilis_in_Costa_Rica_02.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/6/66/Eugenes_spectabilis_in_Costa_Rica_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/6/66/Eugenes_spectabilis_in_Costa_Rica_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Eugenes_spectabilis_in_Costa_Rica_02.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Eugenes_spectabilis_in_Costa_Rica_02.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Eugenes_spectabilis_in_Costa_Rica_02.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Eugenes spectabilis in Costa Rica 02.jpg",
+        "author": "Bgag",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Bgag",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Eugenes spectabilis in Costa Rica 02.jpg",
+        "source": "wikimedia"
+      },
+      {
+        "image_id": "commons-146891890",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Eugenes_spectabilis_in_Costa_Rica_03.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_raw": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Eugenes_spectabilis_in_Costa_Rica_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_full": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Eugenes_spectabilis_in_Costa_Rica_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "url_regular": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Eugenes_spectabilis_in_Costa_Rica_03.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_small": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Eugenes_spectabilis_in_Costa_Rica_03.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "url_thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Eugenes_spectabilis_in_Costa_Rica_03.jpg/1280px-Eugenes_spectabilis_in_Costa_Rica_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "alt": "Eugenes spectabilis in Costa Rica 03.jpg",
+        "author": "Bgag",
+        "author_url": "https://commons.wikimedia.org/wiki/User:Bgag",
+        "source_link": "https://commons.wikimedia.org/wiki/File:Eugenes spectabilis in Costa Rica 03.jpg",
+        "source": "wikimedia"
+      }
+    ]
   }
 }

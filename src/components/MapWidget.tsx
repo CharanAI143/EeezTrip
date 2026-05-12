@@ -55,7 +55,9 @@ export function MapWidget({ destination }: { destination: string }) {
           const lon = parseFloat(best.lon);
           // Use a wider zoom for large regions/countries, tighter for cities
           const zoom = best.type === 'administrative' || best.type === 'island' ? 10 : 12;
-          if (active) setCoords([lat, lon]);
+          if (active && !isNaN(lat) && !isNaN(lon)) {
+            setCoords([lat, lon]);
+          }
           if (active) setZoom(zoom);
         }
       } catch (e) {

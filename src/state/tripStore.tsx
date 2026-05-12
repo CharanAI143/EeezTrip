@@ -51,6 +51,8 @@ const initialPrefs: TripPreferences = {
   mood: 'Relaxed',
   budget: 50000,
   days: 5,
+  startDate: '',
+  endDate: '',
   mode: 'normal',
 };
 

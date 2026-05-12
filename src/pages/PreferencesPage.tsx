@@ -307,7 +307,7 @@ export default function PreferencesPage() {
               We'll craft a structured, day-by-day plan.
             </p>
 
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
               {DAY_OPTIONS.map(d => {
                 const active = prefs.days === d;
                 return (
@@ -335,6 +335,58 @@ export default function PreferencesPage() {
                   </button>
                 );
               })}
+              
+              {/* Custom days input */}
+              <div style={{
+                display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                width: 80, height: 72, borderRadius: 18,
+                background: '#fff', border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                padding: '0 8px'
+              }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={prefs.days}
+                  onChange={(e) => setDays(parseInt(e.target.value) || 1)}
+                  style={{
+                    width: '100%', border: 'none', outline: 'none',
+                    textAlign: 'center', fontFamily: 'Outfit, sans-serif',
+                    fontWeight: 900, fontSize: '1.2rem', color: '#2d5474'
+                  }}
+                />
+                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#5b8bad' }}>CUSTOM</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, color: '#2d5474', marginBottom: 8 }}>Start Date</label>
+                <input
+                  type="date"
+                  value={prefs.startDate}
+                  onChange={(e) => dispatch({ type: 'SET_PREF', field: 'startDate', value: e.target.value })}
+                  style={{
+                    width: '100%', padding: '12px 16px', borderRadius: 12,
+                    border: '1.5px solid rgba(0,0,0,0.08)', outline: 'none',
+                    fontFamily: 'Outfit, sans-serif', fontSize: '1rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, color: '#2d5474', marginBottom: 8 }}>End Date</label>
+                <input
+                  type="date"
+                  value={prefs.endDate}
+                  onChange={(e) => dispatch({ type: 'SET_PREF', field: 'endDate', value: e.target.value })}
+                  style={{
+                    width: '100%', padding: '12px 16px', borderRadius: 12,
+                    border: '1.5px solid rgba(0,0,0,0.08)', outline: 'none',
+                    fontFamily: 'Outfit, sans-serif', fontSize: '1rem'
+                  }}
+                />
+              </div>
             </div>
           </div>
 

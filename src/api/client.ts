@@ -42,6 +42,7 @@ export interface WeatherData {
   temperature_min: number;
   condition: string;
   is_day: number;
+  needs_alternatives: boolean;
 }
 
 export async function fetchWeather(destination: string): Promise<WeatherData | null> {
@@ -132,6 +133,27 @@ export async function reviseRecommendation(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || 'Unable to revise itinerary right now.');
+  }
+
+  return res.json();
+}
+
+export async function fetchWeatherAlternatives(
+  destination: string,
+  condition: string,
+  mood: string,
+  signal?: AbortSignal,
+): Promise<{ alternatives: string[] }> {
+  const res = await fetch(`${BASE}/weather/alternatives`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ destination, condition, mood }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Unable to fetch alternative plans.');
   }
 
   return res.json();
