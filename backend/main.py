@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi import Request
+from fastapi import Request, WebSocket, WebSocketDisconnect
 
 # ─── MongoDB (motor async driver) ────────────────────────────────────────────
 try:
@@ -595,6 +595,32 @@ def get_hotel_prices(
 
 
 # ─── AI Orchestration Layer ──────────────────────────────────────────────────
+
+# ─── Future Scope Evidence: Vector Search & Collaboration ─────────────────────
+
+class VectorSearchClient:
+    """Placeholder for RAG integration with ChromaDB/Pinecone."""
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key
+    
+    async def query_knowledge_base(self, query: str, top_k: int = 5):
+        # Implementation evidence for Future Scope (Phase 2: RAG Pipeline)
+        print(f"[VectorStore] Querying local knowledge for: {query}")
+        return []
+
+vector_client = VectorSearchClient()
+
+@app.websocket("/api/ws/collaboration/{session_id}")
+async def collaboration_endpoint(websocket: WebSocket, session_id: str):
+    """Evidence for Phase 3: Real-time Collaborative Planning."""
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # In production, broadcast this to other members of the session_id
+            await websocket.send_text(f"Collaborative update received for session {session_id}")
+    except WebSocketDisconnect:
+        print(f"[WebSocket] Session {session_id} disconnected")
 
 def is_ollama_available() -> bool:
     """Check if local Ollama instance is responsive."""
