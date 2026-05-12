@@ -99,7 +99,9 @@ try:
 except Exception:
     HAS_MULTIPART = False
 
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+allowed_origins = [origin.strip().rstrip("/") for origin in allowed_origins_raw.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
