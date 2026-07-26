@@ -31,7 +31,7 @@ export const VoiceFormFiller: React.FC<VoiceFormFillerProps> = ({ onDataExtracte
     setIsListening(true);
     setTranscript('');
     setIsSuccess(false);
-    
+
     voiceAssistant.startListening(
       (result) => {
         setTranscript(result.transcript);
@@ -47,7 +47,7 @@ export const VoiceFormFiller: React.FC<VoiceFormFillerProps> = ({ onDataExtracte
 
   const processTranscript = async (text: string) => {
     if (text.length < 5) return;
-    
+
     setIsProcessing(true);
     try {
       const data = await extractTripDataFromVoice(text);
@@ -55,7 +55,7 @@ export const VoiceFormFiller: React.FC<VoiceFormFillerProps> = ({ onDataExtracte
         onDataExtracted(data);
         setIsSuccess(true);
         voiceAssistant.speak("Got it! I've filled in your trip details.");
-        
+
         // Auto-clear success state
         setTimeout(() => setIsSuccess(false), 3000);
       } else {
@@ -75,13 +75,12 @@ export const VoiceFormFiller: React.FC<VoiceFormFillerProps> = ({ onDataExtracte
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={isListening ? () => voiceAssistant.stopListening() : startVoiceCapture}
-        className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl transition-all border-2 ${
-          isListening 
-            ? 'bg-brand-coral text-white border-white animate-pulse' 
+        className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl transition-all border-2 ${isListening
+            ? 'bg-brand-coral text-white border-white animate-pulse'
             : isSuccess
               ? 'bg-green-500 text-white border-white'
               : 'bg-white text-brand-navy border-brand-border hover:border-brand-coral'
-        }`}
+          }`}
       >
         {isProcessing ? (
           <Loader2 className="w-6 h-6 animate-spin" />
@@ -93,7 +92,7 @@ export const VoiceFormFiller: React.FC<VoiceFormFillerProps> = ({ onDataExtracte
           <MicOff className="w-6 h-6 opacity-40" />
         )}
       </motion.button>
-      
+
       <AnimatePresence>
         {isListening && (
           <motion.div

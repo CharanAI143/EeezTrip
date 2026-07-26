@@ -1,6 +1,9 @@
 from pathlib import Path
-from typing import List, Dict, Optional, Any
 import sys
+import os
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from typing import List, Dict, Optional, Any
 import random
 import json
 import io
@@ -65,6 +68,15 @@ async def lifespan(application: FastAPI):
             _mongo_db = None
     else:
         print("[MongoDB] MONGODB_URI not set — skipping Atlas connection.")
+
+    # Register Event-Driven Architecture handlers
+    try:
+        from backend.app.services.event_handlers import register_all_event_handlers
+        register_all_event_handlers()
+        print("[EventBus] Event-Driven Architecture subscribers registered.")
+    except Exception as e:
+        print(f"[EventBus] Subscriber registration note: {e}")
+
     yield
     if _mongo_client:
         _mongo_client.close()
@@ -109,6 +121,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from backend.app.api.v1.router import api_v1_router
+app.include_router(api_v1_router, prefix="/api/v1")
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from get_images import get_place_images

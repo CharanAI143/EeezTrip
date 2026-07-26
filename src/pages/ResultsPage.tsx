@@ -8,6 +8,11 @@ import { Icons } from '../components/Icons';
 import { MapWidget } from '../components/MapWidget';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { WeatherAdvisory } from '../components/WeatherAdvisory';
+import { TravelInsightsCard } from '../components/TravelInsightsCard';
+import { DailyBriefScreen } from '../components/DailyBriefScreen';
+import { FreshnessBadge } from '../components/FreshnessBadge';
+import { BookingOpportunityList } from '../components/BookingOpportunityList';
+import { LearningInsightsCard } from '../components/LearningInsightsCard';
 
 const MOOD_ALTERNATIVES: Record<string, string[]> = {
   'Relaxed': ['Goa', 'Pondicherry', 'Andaman'],
@@ -445,6 +450,7 @@ export default function ResultsPage() {
               <span className="badge badge-pink" style={{ padding: '6px 14px' }}>
                 {preferences?.mood || 'Relaxed'} · {preferences?.days || 4} days
               </span>
+              <FreshnessBadge />
               <ErrorBoundary fallback={<div style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.7)', borderRadius: 999, fontSize: '0.85rem' }}>Weather unavailable</div>}>
                 <WeatherWidget destination={rec.destination || (preferences && preferences.destination) || ''} />
               </ErrorBoundary>
@@ -456,6 +462,14 @@ export default function ResultsPage() {
             </div>
 
             <WeatherAdvisory destination={rec.destination || (preferences && preferences.destination) || ''} mood={preferences?.mood || 'Relaxed'} />
+
+            <DailyBriefScreen destination={rec.destination || (preferences && preferences.destination) || ''} />
+
+            <TravelInsightsCard destination={rec.destination || (preferences && preferences.destination) || ''} />
+
+            <BookingOpportunityList destination={rec.destination || (preferences && preferences.destination) || ''} />
+
+            <LearningInsightsCard />
 
             <h1 style={{
               fontFamily: 'Outfit, sans-serif',

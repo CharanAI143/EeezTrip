@@ -75,7 +75,7 @@ export function SeasonalTrips({ userLocation = "New York", onSelectDestination }
   return (
     <div className="bg-white rounded-[3rem] border border-brand-border p-8 md:p-12 relative overflow-hidden shadow-sm">
       {getBackgroundIcon()}
-      
+
       <div className="relative z-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
@@ -103,7 +103,7 @@ export function SeasonalTrips({ userLocation = "New York", onSelectDestination }
                   {category === 'nearby' ? 'Local & Nearby' : category === 'national' ? 'Across Country' : 'Global Picks'}
                 </h3>
               </div>
-              
+
               <div className="space-y-6">
                 {data[category].map((dest, idx) => (
                   <motion.div
@@ -115,7 +115,7 @@ export function SeasonalTrips({ userLocation = "New York", onSelectDestination }
                     onClick={() => onSelectDestination?.(dest.name)}
                   >
                     <div className="relative h-40 rounded-[1.5rem] overflow-hidden mb-3 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500">
-                      <SmartImage 
+                      <SmartImage
                         place={dest.name}
                         type={dest.type}
                         className="w-full h-full"

@@ -23,16 +23,37 @@ const SendIcon = () => (
   </svg>
 );
 
+import { sendConciergeChat, ConciergeChatResponse } from '../api/client';
+
 export function AiConcierge() {
   const { state, reviseTrip } = useTripStore();
   const [isOpen, setIsOpen] = useState(false);
   const [instruction, setInstruction] = useState('');
+  const [chatResponse, setChatResponse] = useState<ConciergeChatResponse | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!instruction.trim() || state.revising) return;
-    reviseTrip(instruction);
+    if (!instruction.trim() || state.revising || chatLoading) return;
+    const text = instruction;
     setInstruction('');
+
+    // Check if query is a direct revision command vs a concierge question
+    const isRevision = ["cheaper", "extend", "shorten", "add day", "remove", "revise"].some(w => text.toLowerCase().includes(w));
+    if (isRevision) {
+      reviseTrip(text);
+    } else {
+      setChatLoading(true);
+      try {
+        const res = await sendConciergeChat(text, state.sessionId || undefined);
+        setChatResponse(res);
+      } catch {
+        // Fallback to revision
+        reviseTrip(text);
+      } finally {
+        setChatLoading(false);
+      }
+    }
   };
 
   return (
@@ -101,6 +122,21 @@ export function AiConcierge() {
                   <span style={{ color: '#334155', fontSize: '0.95rem', lineHeight: 1.5 }}>
                     Not happy with the current plan? Tell me what to change!
                   </span>
+                  {chatResponse && (
+                    <div style={{
+                      padding: '12px 16px', background: '#f0f9ff', border: '1px solid #bae6fd',
+                      borderRadius: 14, color: '#0369a1', fontSize: '0.88rem', lineHeight: 1.5,
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#0284c7', color: '#fff' }}>
+                          {chatResponse.detected_intent.replace('_', ' ')}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#0284c7' }}>{Math.round(chatResponse.confidence * 100)}% Match</span>
+                      </div>
+                      <div style={{ whiteSpace: 'pre-line' }}>{chatResponse.reply}</div>
+                    </div>
+                  )}
                   {state.reviseError && (
                     <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: '0.85rem' }}>
                       {state.reviseError}
@@ -129,15 +165,19 @@ export function AiConcierge() {
                     </button>
                   </form>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                    {["More food focus", "Less museums", "Cheaper activities"].map(hint => (
+                    {["Make it cheaper", "Add adventure", "Family-friendly", "Extend trip", "Shorten trip", "More food"].map(hint => (
                       <button
                         key={hint}
                         type="button"
-                        onClick={() => setInstruction(hint)}
+                        onClick={() => {
+                          setInstruction(hint);
+                          reviseTrip(hint);
+                        }}
                         style={{
-                          fontSize: '0.75rem', padding: '4px 10px',
-                          background: '#e2e8f0', color: '#475569',
-                          border: 'none', borderRadius: 999, cursor: 'pointer',
+                          fontSize: '0.75rem', padding: '6px 12px',
+                          background: 'rgba(236,72,153,0.1)', color: '#db2777',
+                          border: '1px solid rgba(236,72,153,0.2)', borderRadius: 999, cursor: 'pointer',
+                          fontWeight: 600, transition: 'all 0.2s',
                         }}
                       >
                         {hint}

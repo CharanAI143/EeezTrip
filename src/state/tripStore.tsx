@@ -23,6 +23,8 @@ type State = {
   revising: boolean;
   reviseError: string;
   user: User | null;
+  sessionId: string | null;
+  revisionHistory: Array<{ instruction: string; changeSummary?: string; timestamp: string }>;
 };
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -32,14 +34,15 @@ type Action =
   | { type: 'SET_DESTINATION'; destination: string }
   | { type: 'SET_PREF'; field: keyof TripPreferences; value: string | number }
   | { type: 'SUBMIT_START' }
-  | { type: 'SUBMIT_SUCCESS'; recommendation: Recommendation; images: PlaceImage[] }
+  | { type: 'SUBMIT_SUCCESS'; recommendation: Recommendation; images: PlaceImage[]; sessionId?: string }
   | { type: 'SET_IMAGES'; images: PlaceImage[] }
   | { type: 'SET_RECOMMENDATION'; recommendation: Recommendation }
   | { type: 'SUBMIT_ERROR'; error: string }
   | { type: 'REVISE_START' }
-  | { type: 'REVISE_SUCCESS'; recommendation: Recommendation }
+  | { type: 'REVISE_SUCCESS'; recommendation: Recommendation; instruction?: string }
   | { type: 'REVISE_ERROR'; error: string }
   | { type: 'SET_USER'; user: User | null }
+  | { type: 'SET_SESSION_ID'; sessionId: string }
   | { type: 'RESET' };
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -66,6 +69,8 @@ const initialState: State = {
   revising: false,
   reviseError: '',
   user: null,
+  sessionId: null,
+  revisionHistory: [],
 };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -92,6 +97,7 @@ function reducer(state: State, action: Action): State {
         loading: false,
         recommendation: action.recommendation,
         images: action.images,
+        sessionId: action.sessionId || state.sessionId || `session_${Date.now()}`,
       };
     case 'SET_IMAGES':
       return {
@@ -108,11 +114,24 @@ function reducer(state: State, action: Action): State {
     case 'REVISE_START':
       return { ...state, revising: true, reviseError: '' };
     case 'REVISE_SUCCESS':
-      return { ...state, revising: false, recommendation: action.recommendation };
+      return {
+        ...state,
+        revising: false,
+        recommendation: action.recommendation,
+        revisionHistory: [
+          ...state.revisionHistory,
+          {
+            instruction: action.instruction || 'Itinerary revision',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
     case 'REVISE_ERROR':
       return { ...state, revising: false, reviseError: action.error };
     case 'SET_USER':
       return { ...state, user: action.user };
+    case 'SET_SESSION_ID':
+      return { ...state, sessionId: action.sessionId };
     case 'RESET':
       return { ...initialState };
     default:

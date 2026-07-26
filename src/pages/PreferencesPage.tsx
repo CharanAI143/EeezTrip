@@ -1,6 +1,7 @@
 import { FormEvent, useState, useEffect } from 'react';
 import { useTripStore } from '../state/tripStore';
 import { MoodOption } from '../types';
+import { RecommendationSkeleton } from '../components/RecommendationSkeleton';
 
 const MOODS: MoodOption[] = [
   {
@@ -403,18 +404,48 @@ export default function PreferencesPage() {
             </div>
           </div>
 
-          {/* Error */}
+          {/* ── Loading Skeleton State ────────────────────────────────────────── */}
+          {state.loading && (
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ textAlign: 'center', marginBottom: 16, color: '#0ea5e9', fontWeight: 700, fontSize: '0.95rem' }}>
+                AI Orchestrator is synthesizing your luxury itinerary...
+              </div>
+              <RecommendationSkeleton />
+            </div>
+          )}
+
+          {/* ── Error & Retry View ────────────────────────────────────────── */}
           {state.error && (
             <div style={{
-              marginBottom: 24, padding: '16px 20px',
-              background: 'rgba(254,226,226,0.9)', border: '1px solid #f87171',
-              borderRadius: 16, color: '#991b1b', fontWeight: 600, fontSize: '0.95rem',
-              display: 'flex', alignItems: 'center', gap: 8,
+              marginBottom: 24, padding: '20px 24px',
+              background: 'rgba(254,226,226,0.95)', border: '1.5px solid #f87171',
+              borderRadius: 20, color: '#991b1b', fontWeight: 600, fontSize: '0.95rem',
+              display: 'flex', flexDirection: 'column', gap: 12,
+              boxShadow: '0 8px 24px rgba(248,113,113,0.15)',
             }}>
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              {state.error}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{state.error}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  style={{
+                    padding: '8px 20px', borderRadius: 12, background: '#ef4444',
+                    color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.88rem',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+                  }}
+                >
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Try Again
+                </button>
+              </div>
             </div>
           )}
 
@@ -426,6 +457,8 @@ export default function PreferencesPage() {
             style={{
               width: '100%', borderRadius: 20, fontSize: '1.15rem', padding: '20px',
               position: 'relative', overflow: 'hidden', boxShadow: '0 8px 32px rgba(236,72,153,0.3)',
+              opacity: state.loading ? 0.7 : 1,
+              cursor: state.loading ? 'not-allowed' : 'pointer',
             }}
           >
             {state.loading ? (
