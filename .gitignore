@@ -4,7 +4,11 @@ dist/
 coverage/
 .DS_Store
 *.log
+
+# Real secrets. `.env.example` is the tracked, redacted template, so it has to
+# be re-included: `.env*` alone would exclude it too.
 .env*
-.env.example
+!.env.example
+
 __pycache__/
 *.pyc

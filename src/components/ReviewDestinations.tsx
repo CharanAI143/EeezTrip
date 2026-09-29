@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db, collection, query, getDocs, orderBy, addDoc, serverTimestamp, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, collection, query, getDocs, orderBy, addDoc, serverTimestamp, limit, handleFirestoreError, OperationType } from '../lib/firebase';
 import { User } from 'firebase/auth';
 import { DestinationReview } from '../types';
 import { Star, MessageCircle, Send, Loader2, MapPin, Search, User as UserIcon, Video, Play, ExternalLink, X, Sparkles, Camera } from 'lucide-react';
@@ -12,11 +12,17 @@ interface ReviewDestinationsProps {
   onLogin: () => void;
 }
 
+/** Mirrors the URL check in firestore.rules so bad input fails fast and legibly. */
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/i.test(value.trim());
+}
+
 export function ReviewDestinations({ user, onLogin }: ReviewDestinationsProps) {
   const [reviews, setReviews] = useState<DestinationReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [showAddReview, setShowAddReview] = useState(false);
 
   // New Review Form State
@@ -29,7 +35,9 @@ export function ReviewDestinations({ user, onLogin }: ReviewDestinationsProps) {
     setLoading(true);
     const path = 'reviews';
     try {
-      const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+      // The limit is required by the Firestore rule on this collection; without it
+    // the query is denied. 50 matches the ceiling in firestore.rules.
+    const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(50));
       const snapshot = await getDocs(q);
       const fetched = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -56,7 +64,19 @@ export function ReviewDestinations({ user, onLogin }: ReviewDestinationsProps) {
 
     if (!dest || !reviewText) return;
 
+    // firestore.rules only accepts http(s) for videoUrl, so reject a bad scheme
+    // here rather than letting the write come back as an opaque permission error.
+    if (videoUrl && !isHttpUrl(videoUrl)) {
+      setFormError('Video link must start with http:// or https://');
+      return;
+    }
+    if (reviewText.length > 2000) {
+      setFormError('Review is limited to 2000 characters');
+      return;
+    }
+
     setIsPosting(true);
+    setFormError(null);
     const path = 'reviews';
     try {
       await addDoc(collection(db, path), {
@@ -197,6 +217,12 @@ export function ReviewDestinations({ user, onLogin }: ReviewDestinationsProps) {
                   />
                 </div>
               </div>
+
+              {formError && (
+                <div role="alert" className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-medium text-red-700">
+                  {formError}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-brand-slate block">Text Review</label>

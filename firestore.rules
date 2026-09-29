@@ -22,6 +22,18 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // An optional field that, when present, must be an http(s) URL. Accepts a
+    // null/missing value so callers can omit the field entirely. Blocks
+    // `javascript:`, `data:` and friends, which would otherwise be stored and
+    // then rendered into an href or src.
+    function isOptionalWebUrl(data, field, maxLength) {
+      return !data.keys().hasAny([field]) ||
+             data[field] == null ||
+             (data[field] is string &&
+              data[field].size() <= maxLength &&
+              data[field].matches('^https?://[^\\s]+$'));
+    }
+
     // Saved Trips
     match /saved_trips/{tripId} {
       function isValidTrip(data) {
@@ -38,19 +50,29 @@ service cloud.firestore {
     }
 
     // Reviews
+    // Reviews are intentionally public, so anyone may read one. Collection reads
+    // are still bounded: `allow read: if true` let a single client call pull the
+    // entire collection. Requiring a limit means bulk extraction costs one
+    // metered query per page instead of one unbounded one.
     match /reviews/{reviewId} {
       function isValidReview(data) {
         return data.keys().hasAll(['destination', 'userId', 'userName', 'rating', 'review', 'createdAt']) &&
+               data.keys().hasOnly(['destination', 'userId', 'userName', 'rating', 'review', 'createdAt',
+                                    'userPhoto', 'videoUrl']) &&
                data.destination is string && data.destination.size() <= 200 &&
-               data.userId is string &&
-               data.userName is string &&
+               data.userId is string && isValidId(data.userId) &&
+               data.userName is string && data.userName.size() <= 100 &&
                data.rating is number && data.rating >= 1 && data.rating <= 5 &&
                data.review is string && data.review.size() <= 2000 &&
-               data.createdAt == request.time;
+               data.createdAt == request.time &&
+               isOptionalWebUrl(data, 'userPhoto', 2048) &&
+               isOptionalWebUrl(data, 'videoUrl', 2048);
       }
 
       allow create: if isVerified() && isValidReview(request.resource.data) && isOwner(request.resource.data.userId);
-      allow read: if true; // Reviews are public
+      allow update: if false; // Reviews are immutable; delete and repost instead.
+      allow get: if true; // Public by design.
+      allow list: if request.query.limit <= 50;
       allow delete: if isOwner(resource.data.userId);
     }
   }

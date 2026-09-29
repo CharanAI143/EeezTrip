@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth } from 'firebase/auth';
-import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, Timestamp, type Firestore } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit, serverTimestamp, Timestamp, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -53,6 +53,7 @@ export {
   where, 
   getDocs, 
   orderBy, 
+  limit,
   serverTimestamp, 
   Timestamp,
   signInWithPopup,
