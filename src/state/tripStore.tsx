@@ -156,6 +156,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
+    if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       dispatch({ type: 'SET_USER', user });
     });

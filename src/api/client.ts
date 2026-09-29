@@ -289,27 +289,21 @@ export async function sendConciergeChat(
   query: string,
   sessionId?: string
 ): Promise<ConciergeChatResponse> {
-  // Primary v2 architecture endpoint
-  try {
-    const v2Res = await fetch(`${BASE}/v1/concierge/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, session_id: sessionId }),
-    });
-    if (v2Res.ok) {
-      return await v2Res.json();
-    }
-  } catch (e) {
-    console.warn('V2 Concierge endpoint unavailable, attempting legacy fallback...');
+  const res = await fetch(`${BASE}/v1/concierge/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, session_id: sessionId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const detail = err.detail;
+    throw new Error(
+      typeof detail === 'string' ? detail : 'Unable to reach the travel concierge right now.'
+    );
   }
 
-  // Fallback response
-  return {
-    reply: `Here is information regarding your query: "${query}". Have a wonderful trip!`,
-    detected_intent: 'GENERAL_TRAVEL_ADVICE',
-    confidence: 0.8,
-    action_taken: 'Fallback Client Response',
-  };
+  return res.json();
 }
 
 export interface BriefRecommendationItem {
@@ -359,7 +353,7 @@ export interface BookingRecommendationItem {
   savings_amount: number;
   offer: {
     id: string;
-    provider: str;
+    provider: string;
     category: string;
     title: string;
     price: number;

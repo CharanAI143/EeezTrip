@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage';
 import ChoicePage from './pages/ChoicePage';
 import GetStartedPage from './pages/GetStartedPage';
 import MoodStartPage from './pages/MoodStartPage';
+import MoodDestinationPage from './pages/MoodDestinationPage';
 import PreferencesPage from './pages/PreferencesPage';
 import ResultsPage from './pages/ResultsPage';
 import BookingPage from './pages/BookingPage';
@@ -20,6 +21,7 @@ function AppRouter() {
     choice: <ChoicePage />,
     start: <GetStartedPage />,
     'mood-start': <MoodStartPage />,
+    'mood-destination': <MoodDestinationPage />,
     preferences: <PreferencesPage />,
     results: <ResultsPage />,
     booking: <BookingPage />,

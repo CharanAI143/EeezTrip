@@ -14,10 +14,14 @@ class Settings(BaseModel):
     
     # AI Providers
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3")
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     DEEP_MODE_TIMEOUT_SEC: int = int(os.getenv("DEEP_MODE_TIMEOUT_SEC", "12"))
+    AI_REQUEST_TIMEOUT_SEC: int = int(os.getenv("AI_REQUEST_TIMEOUT_SEC", "90"))
+    AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.5"))
     
     # External APIs
     SERPAPI_API_KEY: str = os.getenv("SERPAPI_API_KEY", "")

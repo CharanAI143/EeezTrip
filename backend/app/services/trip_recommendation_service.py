@@ -21,6 +21,9 @@ class TripRecommendationService:
         # Validate Cost Breakdown Alignment
         self._align_cost_breakdown(recommendation, req.budget)
 
+        # Normalise day count so the plan always matches the requested duration.
+        self._align_day_count(recommendation, req.days)
+
         # Persistence to MongoDB via Repository
         trip_doc = {
             "user_id": "anonymous",
@@ -50,9 +53,44 @@ class TripRecommendationService:
             raise ValueError("Trip duration must be between 1 and 14 days.")
 
     def _align_cost_breakdown(self, recommendation: TripResponse, target_budget: int) -> None:
+        """Ensure the cost breakdown sums exactly to the requested budget."""
+        if target_budget <= 0:
+            return
+
         cb = recommendation.estimated_cost_breakdown
-        current_sum = cb.accommodation + cb.food + cb.transport + cb.activities + cb.misc
-        if current_sum != target_budget and target_budget > 0:
-            # Rebalance misc to ensure exact budget sum rule
-            diff = target_budget - (cb.accommodation + cb.food + cb.transport + cb.activities)
-            cb.misc = max(0, diff)
+        fields = ("accommodation", "food", "transport", "activities")
+        for field in fields:
+            setattr(cb, field, max(0, int(getattr(cb, field))))
+        cb.misc = max(0, int(cb.misc))
+
+        # Absorb any drift into misc; if the fixed categories already exceed the budget,
+        # scale them down proportionally rather than silently under-reporting the total.
+        subtotal = sum(getattr(cb, field) for field in fields)
+        if subtotal > target_budget:
+            scale = target_budget / subtotal
+            for field in fields:
+                setattr(cb, field, int(getattr(cb, field) * scale))
+            subtotal = sum(getattr(cb, field) for field in fields)
+
+        cb.misc = max(0, target_budget - subtotal)
+
+    def _align_day_count(self, recommendation: TripResponse, target_days: int) -> None:
+        """Ensure the daily plan has exactly the requested number of sequential day blocks."""
+        target = max(1, min(target_days, 14))
+        plan = list(recommendation.daily_plan)
+        if not plan:
+            return
+
+        if len(plan) > target:
+            plan = plan[:target]
+        elif len(plan) < target:
+            last = plan[-1]
+            for index in range(len(plan) + 1, target + 1):
+                plan.append(last.model_copy(update={
+                    "day": index,
+                    "title": f"{last.title} (continued)",
+                }))
+
+        for index, entry in enumerate(plan, start=1):
+            entry.day = index
+        recommendation.daily_plan = plan

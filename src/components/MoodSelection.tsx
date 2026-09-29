@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Zap, Coffee, Ghost, Palmtree, Mountain, Music, Heart, Loader2, ArrowRight, Wallet, Coins, TreePine, Waves, MountainSnow, Sun } from 'lucide-react';
+import { Sparkles, Zap, Coffee, Ghost, Palmtree, Mountain, Heart, Loader2, ArrowRight, Wallet, Coins } from 'lucide-react';
 import { getMoodRecommendations } from '../lib/gemini';
 import { cn } from '../lib/utils';
 import { Currency } from '../types';
@@ -149,7 +149,7 @@ export function MoodSelection({ onSelectDestination }: MoodSelectionProps) {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-3 gap-6"
           >
-            {recommendations.map((rec, idx) => (
+            {recommendations.map(rec => (
               <button
                 key={rec.name}
                 onClick={() => onSelectDestination(rec.name, moodBudget, moodCurrency)}

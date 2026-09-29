@@ -9,7 +9,7 @@ export default function MoodStartPage() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    navigate('preferences');
+    navigate('mood-destination');
   };
 
   return (
@@ -35,7 +35,7 @@ export default function MoodStartPage() {
             position: 'absolute', top: 90, left: 32,
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
-            color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
+            color: '#3f7295', fontWeight: 600, fontSize: '0.95rem',
           }}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -67,8 +67,8 @@ export default function MoodStartPage() {
             <span className="text-gradient-duo">leaving from?</span>
           </h1>
 
-          <p style={{ color: '#5b8bad', fontSize: '1.15rem', marginBottom: 48, lineHeight: 1.6 }}>
-            Tell us your starting point, and we'll handle the rest.
+          <p style={{ color: '#3f7295', fontSize: '1.15rem', marginBottom: 48, lineHeight: 1.6 }}>
+            Tell us where you're starting from — it's optional, but it helps us estimate travel costs.
           </p>
 
           {/* Search form */}

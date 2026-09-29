@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 // ─── Trip Request ────────────────────────────────────────────────────────────
 
 export type TripPreferences = {
@@ -33,6 +35,8 @@ export type DayPlan = {
   afternoon: string;
   evening: string;
   tip: string;
+  /** Optional accommodation suggestion for the night of this day. */
+  stay?: string;
 };
 
 export type CostBreakdown = {
@@ -69,7 +73,7 @@ export type PlaceImage = {
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
-export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'preferences' | 'results' | 'booking' | 'dashboard' | 'reviews';
+export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'mood-destination' | 'preferences' | 'results' | 'booking' | 'dashboard' | 'reviews';
 
 // ─── Database Records ───────────────────────────────────────────────────────
 
@@ -103,3 +107,80 @@ export type MoodOption = {
   color: string;
   pinkAccent?: boolean;
 };
+
+// ─── Map Markers ─────────────────────────────────────────────────────────────
+
+export type MapMarker = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  day?: number;
+  time?: string;
+  description?: string;
+  category?: string;
+};
+
+// ─── Firestore-backed Collections ────────────────────────────────────────────
+
+/** Firestore `serverTimestamp()` placeholders resolve to a `Timestamp` on read. */
+export type FirestoreTimestamp = Date | string | number | { toDate?: () => Date } | null;
+
+export type SavedTrip = {
+  id: string;
+  userId: string;
+  title: string;
+  destination: string;
+  content: string;
+  createdAt?: FirestoreTimestamp;
+};
+
+export type DestinationReview = {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string | null;
+  destination: string;
+  rating: number;
+  review: string;
+  videoUrl?: string | null;
+  createdAt?: FirestoreTimestamp;
+};
+
+// ─── Trip Form Options ───────────────────────────────────────────────────────
+
+export const Currency = {
+  options: ['USD', 'INR', 'EUR', 'GBP', 'AED', 'SGD', 'THB', 'JPY', 'AUD', 'CAD'],
+} as const;
+export type Currency = (typeof Currency.options)[number];
+
+export const TravelStyle = {
+  options: ['budget', 'mid-range', 'luxury', 'backpacking'],
+} as const;
+export type TravelStyle = (typeof TravelStyle.options)[number];
+
+export const Preference = {
+  options: ['beaches', 'mountains', 'food', 'culture', 'nightlife', 'nature', 'shopping', 'history'],
+} as const;
+export type Preference = (typeof Preference.options)[number];
+
+export const TripType = {
+  options: ['leisure', 'adventure', 'romantic', 'business', 'family', 'solo', 'backpacking'],
+} as const;
+export type TripType = (typeof TripType.options)[number];
+
+export const TripFormSchema = z.object({
+  startLocation: z.string().min(2, 'Start location is required'),
+  destination: z.string().min(2, 'Destination is required'),
+  duration: z.coerce.number().int().min(1).max(30),
+  guests: z.coerce.number().int().min(1),
+  currency: z.string(),
+  budget: z.coerce.number().min(0),
+  travelStyle: z.string(),
+  preferences: z.array(z.string()).default([]),
+  tripTypes: z.array(z.string()).default([]),
+  notes: z.string().optional(),
+});
+
+export type TripFormData = z.infer<typeof TripFormSchema>;
+

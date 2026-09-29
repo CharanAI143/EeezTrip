@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { db, collection, query, where, getDocs, orderBy, handleFirestoreError, OperationType } from '../lib/firebase';
 import { User } from 'firebase/auth';
 import { SavedTrip } from '../types';
-import { Calendar, MapPin, ChevronRight, Loader2, BookmarkX, ExternalLink, Camera } from 'lucide-react';
+import { MapPin, ChevronRight, Loader2, BookmarkX, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
+import { toDate } from '../lib/utils';
 import { ItineraryDisplay } from './ItineraryDisplay';
 
 interface SavedTripsProps {
@@ -142,7 +143,7 @@ export function SavedTrips({ user, onLogin }: SavedTripsProps) {
                     </div>
                     {trip.createdAt && (
                       <span className="text-[10px] text-gray-400 font-medium ml-auto">
-                        {format(trip.createdAt.toDate ? trip.createdAt.toDate() : new Date(trip.createdAt), 'MMM d, yyyy')}
+                        {toDate(trip.createdAt) ? format(toDate(trip.createdAt) as Date, 'MMM d, yyyy') : ''}
                       </span>
                     )}
                   </div>

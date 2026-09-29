@@ -53,7 +53,7 @@ export default function GetStartedPage() {
             position: 'absolute', top: 90, left: 32,
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
-            color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
+            color: '#3f7295', fontWeight: 600, fontSize: '0.95rem',
           }}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -85,7 +85,7 @@ export default function GetStartedPage() {
             <span className="text-gradient-duo">escape to?</span>
           </h1>
 
-          <p style={{ color: '#5b8bad', fontSize: '1.15rem', marginBottom: 48, lineHeight: 1.6 }}>
+          <p style={{ color: '#3f7295', fontSize: '1.15rem', marginBottom: 48, lineHeight: 1.6 }}>
             Type any city, country, or region. We'll curate the perfect experience.
           </p>
 
@@ -185,7 +185,7 @@ export default function GetStartedPage() {
             display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32,
           }}>
             <div style={{ flex: 1, height: 1, background: 'rgba(186,230,253,0.6)' }} />
-            <span style={{ color: '#5b8bad', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <span style={{ color: '#3f7295', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               or select a popular destination
             </span>
             <div style={{ flex: 1, height: 1, background: 'rgba(186,230,253,0.6)' }} />

@@ -1,21 +1,92 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTripStore } from '../state/tripStore';
 
-// High-quality Unsplash images for popular destinations
+const FLIP_DELAY_MS = 3000;
+
+/**
+ * Static editorial copy for the flip cards. `region` and `famousFor` are
+ * well-known facts about each place, written to be accurate without a live
+ * lookup — anything that changes per trip (cost, weather, opening hours)
+ * comes from the API once a plan is generated.
+ */
 const DESTINATIONS = [
-  { name: 'Santorini', tag: 'Romantic escape', image: 'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?q=80&w=800&auto=format&fit=crop' },
-  { name: 'Bali', tag: 'Nature & culture', image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=800&auto=format&fit=crop' },
-  { name: 'Kyoto', tag: 'Serene tradition', image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=800&auto=format&fit=crop' },
-  { name: 'Maldives', tag: 'Island paradise', image: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?q=80&w=800&auto=format&fit=crop' },
-  { name: 'Swiss Alps', tag: 'Adventure peaks', image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=800&auto=format&fit=crop' },
-  { name: 'Paris', tag: 'City of love', image: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?q=80&w=800&auto=format&fit=crop' },
+  {
+    name: 'Santorini',
+    tag: 'Romantic escape',
+    region: 'Cyclades, Greece',
+    image: 'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?q=80&w=800&auto=format&fit=crop',
+    blurb: 'Whitewashed cliff villages stacked above a drowned volcano caldera.',
+    famousFor: ['Caldera sunsets', 'Blue-domed Oia', 'Volcanic hot springs'],
+  },
+  {
+    name: 'Bali',
+    tag: 'Nature & culture',
+    region: 'Indonesia, Southeast Asia',
+    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=800&auto=format&fit=crop',
+    blurb: 'A volcanic island where Hindu temple rites sit minutes from surf breaks.',
+    famousFor: ['Ubud rice terraces', 'Uluwatu cliff temples', 'Reef breaks'],
+  },
+  {
+    name: 'Kyoto',
+    tag: 'Serene tradition',
+    region: 'Kansai, Japan',
+    image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=800&auto=format&fit=crop',
+    blurb: 'Former imperial capital, preserved almost intact across seventeen centuries.',
+    famousFor: ['Fushimi Inari gates', 'Arashiyama bamboo', 'Machiya wooden streets'],
+  },
+  {
+    name: 'Maldives',
+    tag: 'Island paradise',
+    region: 'Indian Ocean, South Asia',
+    image: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?q=80&w=800&auto=format&fit=crop',
+    blurb: 'A chain of coral atolls ringed by two thousand kilometres of reef.',
+    famousFor: ['Overwater villas', 'Glass-clear lagoons', 'House-reef diving'],
+  },
+  {
+    name: 'Swiss Alps',
+    tag: 'Adventure peaks',
+    region: 'Central Europe',
+    image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=800&auto=format&fit=crop',
+    blurb: 'Glacier-carved valleys crossed by rack railways and walking trails.',
+    famousFor: ['Jungfraujoch rail', 'Glacier Express', 'Alpine lakes'],
+  },
+  {
+    name: 'Paris',
+    tag: 'City of love',
+    region: 'Île-de-France, France',
+    image: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?q=80&w=800&auto=format&fit=crop',
+    blurb: 'A river-bisected capital of museum halls and neighbourhood bistros.',
+    famousFor: ['The Louvre', 'Seine-side walks', 'Montmartre at dawn'],
+  },
 ];
 
+/**
+ * Hero cards reference DESTINATIONS by index rather than re-pasting URLs, and
+ * deliberately skip Santorini/Kyoto/Swiss Alps so the hero does not simply
+ * preview the first row of the grid below it.
+ */
+const HERO_CARDS = [DESTINATIONS[3], DESTINATIONS[1], DESTINATIONS[5]];
+
 const STATS = [
-  { value: '50K+', label: 'Trips Planned' },
-  { value: '120+', label: 'Destinations' },
-  { value: '4.9★', label: 'Avg Rating' },
-  { value: '98%', label: 'Satisfaction' },
+  { value: '2–14', label: 'Day Itineraries' },
+  { value: '4', label: 'Slots Per Day' },
+  { value: '5', label: 'Cost Categories' },
+  { value: '3', label: 'AI Providers' },
+];
+
+const STEPS = [
+  {
+    title: 'Pick your vibe',
+    desc: 'Already know where you are going? Enter a destination and plan around it. Not sure? Pick a mood and we will suggest places that suit it.',
+  },
+  {
+    title: 'Set budget and days',
+    desc: 'Give us a budget and a trip length. We keep every rupee accounted for across stay, food, transport, activities, and extras.',
+  },
+  {
+    title: 'Get your itinerary',
+    desc: 'Receive a day-by-day plan with morning-to-evening slots, local food picks, live photos, and insider tips you can revise by just asking.',
+  },
 ];
 
 const FEATURES = [
@@ -41,53 +112,71 @@ const FEATURES = [
   {
     icon: (
       <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    title: 'Smart Budget Breakdown',
-    desc: 'Know exactly where every dollar goes — accommodation, food, transport, and activities all mapped out.',
-  },
-  {
-    icon: (
-      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-      </svg>
-    ),
-    title: 'Day-by-Day Itinerary',
-    desc: 'Morning, afternoon, and evening plans for each day — with insider tips and local food picks included.',
-  },
-  {
-    icon: (
-      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
     title: 'Instant Results',
     desc: 'No waiting, no signup, no friction. Enter your preferences and get your full trip plan in seconds.',
   },
-  {
-    icon: (
-      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-      </svg>
-    ),
-    title: 'Tailored Travel Moods',
-    desc: 'Relaxed, Romantic, Adventure, Nature, or Foodie — every vibe gets a uniquely curated experience.',
-  },
 ];
+
+/**
+ * These three used to be joined by 'Smart Budget Breakdown', 'Day-by-Day
+ * Itinerary' and 'Tailored Travel Moods'. Each restated one of the three
+ * How It Works steps almost word for word, so the page was explaining the same
+ * flow twice. Restoring them is a paste into this array if the section needs
+ * the weight back.
+ */
 
 export default function LandingPage() {
   const { navigate, dispatch } = useTripStore();
-  const [visible, setVisible] = useState(false);
+  const [flipped, setFlipped] = useState<string | null>(null);
+  const hoverTimer = useRef<number | null>(null);
+  const hoveredCard = useRef<string | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 80);
-    return () => clearTimeout(t);
-  }, []);
+  const clearHoverTimer = () => {
+    if (hoverTimer.current !== null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
+  useEffect(() => clearHoverTimer, []);
 
   const handleDestinationClick = (name: string) => {
     dispatch({ type: 'SET_DESTINATION', destination: name });
     navigate('preferences');
+  };
+
+  /**
+   * A card flips when tapped, or when the pointer rests on it for 3s. The
+   * dwell timer is cancelled as soon as the pointer leaves so a quick pass
+   * never triggers it.
+   */
+  const startHoverTimer = (name: string) => {
+    clearHoverTimer();
+    hoveredCard.current = name;
+    hoverTimer.current = window.setTimeout(() => {
+      setFlipped(name);
+      hoverTimer.current = null;
+    }, FLIP_DELAY_MS);
+  };
+
+  const cancelHoverTimer = () => {
+    if (hoveredCard.current !== null) {
+      clearHoverTimer();
+      hoveredCard.current = null;
+    }
+  };
+
+  const toggleFlip = (name: string) => {
+    cancelHoverTimer();
+    setFlipped(prev => (prev === name ? null : name));
+  };
+
+  const scrollTo = (id: string) => {
+    const target = document.getElementById(id);
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -116,7 +205,7 @@ export default function LandingPage() {
           }}>
             {/* Left Column: Text & CTA */}
             <div style={{ textAlign: 'left', maxWidth: 600 }}>
-              <div className={`badge badge-ice anim-fade-up ${visible ? '' : 'opacity-0'}`} style={{ marginBottom: 24, display: 'inline-flex' }}>
+              <div className="badge badge-ice anim-fade-up" style={{ marginBottom: 24, display: 'inline-flex' }}>
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: 6 }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
                 </svg>
@@ -135,9 +224,9 @@ export default function LandingPage() {
                   color: '#0c1b33',
                 }}
               >
-                Your next trip, <br />
+                Your next trip,<br />{' '}
                 <span className="text-gradient-duo">perfectly planned</span>
-                <br />in seconds.
+                <br />{' '}in seconds.
               </h1>
 
               <p
@@ -166,10 +255,7 @@ export default function LandingPage() {
                 </button>
                 <button
                   className="btn btn-outline btn-lg"
-                  onClick={() => {
-                    const features = document.getElementById('features-section');
-                    if (features) features.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                  onClick={() => scrollTo('how-it-works')}
                   style={{ borderRadius: 999 }}
                 >
                   See How It Works
@@ -180,18 +266,17 @@ export default function LandingPage() {
             {/* Right Column: Floating 3D Image Composition */}
             <div className="anim-fade-up delay-400" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               <div className="hero-floating-grid">
-                {/* Image 1: Main Top Right */}
-                <div className="hero-card hero-card-1 animate-float">
-                  <img src="https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?q=80&w=600&auto=format&fit=crop" alt="Santorini" />
-                </div>
-                {/* Image 2: Bottom Left */}
-                <div className="hero-card hero-card-2 animate-float-fast" style={{ animationDelay: '1s' }}>
-                  <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop" alt="Kyoto" />
-                </div>
-                {/* Image 3: Far Right Behind */}
-                <div className="hero-card hero-card-3 animate-float-slow" style={{ animationDelay: '2s' }}>
-                  <img src="https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?q=80&w=600&auto=format&fit=crop" alt="Swiss Alps" />
-                </div>
+                {HERO_CARDS.map((d, i) => (
+                  <div
+                    key={d.name}
+                    className={`hero-card hero-card-${i + 1} ${
+                      i === 0 ? 'animate-float' : i === 1 ? 'animate-float-fast' : 'animate-float-slow'
+                    }`}
+                    style={i === 0 ? undefined : { animationDelay: `${i}s` }}
+                  >
+                    <img src={d.image.replace('w=800', 'w=600')} alt={d.name} loading="eager" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -223,9 +308,66 @@ export default function LandingPage() {
                 }}>
                   {s.value}
                 </div>
-                <div style={{ color: '#5b8bad', fontSize: '0.9rem', fontWeight: 600, marginTop: 4 }}>
+                <div style={{ color: '#3f7295', fontSize: '0.9rem', fontWeight: 600, marginTop: 4 }}>
                   {s.label}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How It Works ─────────────────────────────────────────────── */}
+      <section id="how-it-works" style={{
+        padding: '80px 24px',
+        background: 'linear-gradient(180deg, transparent, rgba(224,242,254,0.4), transparent)',
+        position: 'relative', zIndex: 1, scrollMarginTop: 90,
+      }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div className="badge badge-ice" style={{ marginBottom: 16 }}>How It Works</div>
+            <h2 style={{
+              fontFamily: 'Outfit, sans-serif',
+              fontSize: 'clamp(2rem, 4vw, 3rem)',
+              fontWeight: 900,
+              color: '#0c1b33',
+            }}>
+              Three steps, <span className="text-gradient-duo">one perfect trip</span>
+            </h2>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 24,
+            maxWidth: 1100,
+            margin: '0 auto',
+          }}>
+            {STEPS.map((step, i) => (
+              <div
+                key={step.title}
+                className="glass anim-fade-up"
+                style={{ padding: '32px', animationDelay: `${i * 0.1}s`, position: 'relative' }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: 16,
+                  background: 'linear-gradient(135deg, #0284c7, #ec4899)',
+                  color: '#fff', fontFamily: 'Outfit, sans-serif', fontWeight: 900, fontSize: '1.4rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 20,
+                }}>
+                  {i + 1}
+                </div>
+                <h3 style={{
+                  fontFamily: 'Outfit, sans-serif',
+                  fontWeight: 800, fontSize: '1.25rem',
+                  color: '#0c1b33', marginBottom: 10,
+                }}>
+                  {step.title}
+                </h3>
+                <p style={{ color: '#3f7295', lineHeight: 1.65, fontSize: '0.95rem', margin: 0 }}>
+                  {step.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -245,8 +387,8 @@ export default function LandingPage() {
             }}>
               Trending <span className="text-gradient-ice">destinations</span>
             </h2>
-            <p style={{ color: '#5b8bad', marginTop: 12, fontSize: '1.1rem' }}>
-              Click any destination to start planning instantly
+            <p style={{ color: '#3f7295', marginTop: 12, fontSize: '1.1rem' }}>
+              Tap a card, or hover for 3 seconds, to see what makes each place worth the trip
             </p>
           </div>
 
@@ -256,30 +398,76 @@ export default function LandingPage() {
             gap: 24,
           }}>
             {DESTINATIONS.map((d, i) => (
-              <button
+              <div
                 key={d.name}
-                onClick={() => handleDestinationClick(d.name)}
                 className="img-card anim-fade-up"
-                style={{
-                  height: 340,
-                  cursor: 'pointer',
-                  border: 'none',
-                  padding: 0,
-                  textAlign: 'left',
-                  animationDelay: `${i * 0.1}s`,
-                }}
+                data-flipped={flipped === d.name}
+                style={{ height: 340, animationDelay: `${i * 0.1}s` }}
+                onMouseEnter={() => startHoverTimer(d.name)}
+                onMouseLeave={cancelHoverTimer}
               >
-                <img src={d.image} alt={d.name} loading="lazy" />
-                <div className="img-card-overlay" />
-                <div className="img-card-content">
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.05em', color: '#bae6fd', textTransform: 'uppercase', marginBottom: 6 }}>
-                    {d.tag}
+                <div className="img-card-inner">
+                  {/* Front */}
+                  <div className="img-card-face img-card-front">
+                    <img src={d.image} alt={d.name} loading="lazy" />
+                    <div className="img-card-overlay" />
+                    <button
+                      type="button"
+                      className="img-card-hit"
+                      aria-expanded={flipped === d.name}
+                      aria-label={`${flipped === d.name ? 'Hide details for' : 'Show details for'} ${d.name}`}
+                      onClick={() => toggleFlip(d.name)}
+                    />
+                    <div className="img-card-hint" aria-hidden="true">
+                      {flipped === d.name ? 'Tap to close' : 'Tap for details'}
+                    </div>
+                    <div className="img-card-content">
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.05em', color: '#bae6fd', textTransform: 'uppercase', marginBottom: 6 }}>
+                        {d.tag}
+                      </div>
+                      <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
+                        {d.name}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.1 }}>
-                    {d.name}
+
+                  {/* Back. `inert` matters here: aria-hidden alone does not
+                      remove the buttons below from the tab order, so keyboard
+                      users would otherwise land on an invisible back face. */}
+                  <div
+                    className="img-card-face img-card-back"
+                    aria-hidden={flipped !== d.name}
+                    inert={flipped !== d.name}
+                  >
+                    <div className="img-card-back-tag">{d.tag}</div>
+                    <h3 className="img-card-back-title">{d.name}</h3>
+                    <p className="img-card-back-region">{d.region}</p>
+                    <p className="img-card-back-body">{d.blurb}</p>
+                    <p className="img-card-back-label" id={`famous-${i}`}>
+                      Most famous for
+                    </p>
+                    <ul className="img-card-highlights" aria-labelledby={`famous-${i}`}>
+                      {d.famousFor.map(h => <li key={h}>{h}</li>)}
+                    </ul>
+                    <div className="img-card-back-actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleDestinationClick(d.name)}
+                      >
+                        Plan this trip
+                      </button>
+                      <button
+                        type="button"
+                        className="img-card-flip-back"
+                        onClick={() => toggleFlip(d.name)}
+                      >
+                        Back
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -313,15 +501,12 @@ export default function LandingPage() {
             {FEATURES.map((f, i) => (
               <div
                 key={f.title}
-                className="glass anim-fade-up"
+                className="glass feature-card anim-fade-up"
                 style={{
                   padding: '32px',
                   animationDelay: `${i * 0.08}s`,
-                  transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
                   boxShadow: '0 8px 30px rgba(12, 27, 51, 0.05)'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-6px)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = '')}
               >
                 <div className="icon-wrap" style={{ marginBottom: 20 }}>
                   {f.icon}
@@ -333,7 +518,7 @@ export default function LandingPage() {
                 }}>
                   {f.title}
                 </h3>
-                <p style={{ color: '#5b8bad', lineHeight: 1.65, fontSize: '0.95rem' }}>
+                <p style={{ color: '#3f7295', lineHeight: 1.65, fontSize: '0.95rem' }}>
                   {f.desc}
                 </p>
               </div>
@@ -384,7 +569,7 @@ export default function LandingPage() {
               onClick={() => navigate('choice')}
               style={{ fontSize: '1.1rem', borderRadius: 999, padding: '16px 36px', background: 'rgba(255,255,255,0.1)' }}
             >
-              Plan My Trip Now
+              Plan My Trip Now — It's Free
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft: 6 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
@@ -397,12 +582,13 @@ export default function LandingPage() {
       <footer style={{
         textAlign: 'center',
         padding: '32px 24px',
-        color: '#5b8bad',
+        color: '#3f7295',
         fontSize: '0.9rem',
         borderTop: '1px solid rgba(186,230,253,0.4)',
         position: 'relative', zIndex: 1,
       }}>
-        <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, color: '#0284c7' }}>EeezTrip</span>
+        {/* #0284c7 was 3.84:1 here; #0369a1 gives 5.57:1. */}
+        <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, color: '#0369a1' }}>EeezTrip</span>
         {' '}— Premium AI Travel Planner · Built with ❤️ · {new Date().getFullYear()}
       </footer>
     </div>

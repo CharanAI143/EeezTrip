@@ -15,9 +15,12 @@ const PAGE_PROGRESS: Record<Page, number> = {
   choice: 12,
   start: 25,
   'mood-start': 25,
+  'mood-destination': 38,
   preferences: 50,
   results: 75,
   booking: 100,
+  dashboard: 75,
+  reviews: 20,
 };
 
 const PLANE_SVG = (
@@ -32,6 +35,10 @@ export default function Navbar() {
   const progress = PAGE_PROGRESS[state.page];
 
   const handleSignIn = async () => {
+    if (!auth || !googleProvider) {
+      console.warn("Sign-in is unavailable: Firebase is not configured.");
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (e) {
@@ -40,6 +47,7 @@ export default function Navbar() {
   };
 
   const handleSignOut = async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
       setUserDropdownOpen(false);
@@ -83,6 +91,8 @@ export default function Navbar() {
             border: 'none',
             cursor: 'pointer',
             padding: 0,
+            minWidth: 44,
+            minHeight: 44,
           }}
         >
           <span style={{
@@ -130,11 +140,12 @@ export default function Navbar() {
                   fontFamily: 'Outfit, sans-serif',
                   fontWeight: active ? 700 : 500,
                   fontSize: '0.875rem',
-                  color: active ? '#0284c7' : '#5b8bad',
+                  color: active ? '#0284c7' : '#3f7295',
                   background: active ? 'rgba(56,189,248,0.12)' : 'none',
                   border: 'none',
                   borderRadius: 999,
-                  padding: '6px 14px',
+                  padding: '11px 16px',
+                  minHeight: 44,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
@@ -142,7 +153,7 @@ export default function Navbar() {
                   if (!active) (e.currentTarget as HTMLButtonElement).style.color = '#0284c7';
                 }}
                 onMouseLeave={e => {
-                  if (!active) (e.currentTarget as HTMLButtonElement).style.color = '#5b8bad';
+                  if (!active) (e.currentTarget as HTMLButtonElement).style.color = '#3f7295';
                 }}
               >
                 {label}
@@ -166,7 +177,7 @@ export default function Navbar() {
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 style={{
                   background: 'none', padding: 0, cursor: 'pointer',
-                  width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
+                  width: 44, height: 44, borderRadius: '50%', overflow: 'hidden',
                   border: '2px solid #0284c7'
                 }}
               >
@@ -222,7 +233,7 @@ export default function Navbar() {
                 fontWeight: 600, fontSize: '0.9rem',
                 color: '#fff', background: '#0f172a',
                 border: 'none', borderRadius: 999,
-                padding: '8px 20px', cursor: 'pointer',
+                padding: '8px 20px', minHeight: 44, cursor: 'pointer',
                 transition: 'background 0.2s',
               }}
               onMouseEnter={e => e.currentTarget.style.background = '#334155'}

@@ -1,0 +1,36 @@
+# Frontend-only assets — the image is backend-only
+src/
+public/
+dist/
+index.html
+node_modules/
+package.json
+package-lock.json
+vite.config.ts
+vitest.config.ts
+tsconfig.json
+eslint.config.js
+vercel.json
+firebase-blueprint.json
+firestore.rules
+metadata.json
+runtime.txt
+README.md
+
+# VCS / tooling
+.git/
+.gitignore
+.pytest_cache/
+.vscode/
+.idea/
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets — injected at runtime via env_file / --env-file
+.env
+.env.*

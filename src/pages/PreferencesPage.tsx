@@ -57,11 +57,15 @@ export default function PreferencesPage() {
 
   const [budgetInput, setBudgetInput] = useState(String(prefs.budget));
 
+  const isMood = prefs.planningType === 'mood';
+  const hasDestination = prefs.destination.trim().length >= 2;
+
+  // Both planning types now require a destination, so the submit can never
+  // reach the API with an empty one.
   useEffect(() => {
-    if (prefs.planningType === 'detailed' && (!prefs.destination || prefs.destination.trim().length < 2)) {
-      navigate('start');
-    }
-  }, [prefs.destination, prefs.planningType, navigate]);
+    if (hasDestination) return;
+    navigate(isMood ? 'mood-destination' : 'start');
+  }, [hasDestination, isMood, navigate]);
 
   const setMood = (mood: string) => dispatch({ type: 'SET_PREF', field: 'mood', value: mood });
   const setDays = (days: number) => dispatch({ type: 'SET_PREF', field: 'days', value: days });
@@ -92,12 +96,12 @@ export default function PreferencesPage() {
       }}>
         {/* Back */}
         <button
-          onClick={() => navigate(prefs.planningType === 'detailed' ? 'start' : 'mood-start')}
+          onClick={() => navigate(prefs.planningType === 'detailed' ? 'start' : 'mood-destination')}
           style={{
             position: 'absolute', top: 90, left: 32,
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
-            color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
+            color: '#3f7295', fontWeight: 600, fontSize: '0.95rem',
           }}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -108,23 +112,23 @@ export default function PreferencesPage() {
 
         {/* Header */}
         <div className="anim-fade-up" style={{ textAlign: 'center', marginBottom: 56 }}>
-          {prefs.planningType === 'detailed' && (
-            <button
-              onClick={() => navigate('start')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
-                marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto 20px',
-              }}
-            >
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Change Destination
-            </button>
-          )}
+          <button
+            onClick={() => navigate(isMood ? 'mood-destination' : 'start')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#3f7295', fontWeight: 600, fontSize: '0.95rem',
+              display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto 20px',
+            }}
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            Change Destination
+          </button>
 
-          <div className="badge badge-pink" style={{ marginBottom: 16 }}>Step 2 of 2</div>
+          <div className="badge badge-pink" style={{ marginBottom: 16 }}>
+            {isMood ? 'Step 3 of 3' : 'Step 2 of 2'}
+          </div>
 
           <h1 style={{
             fontFamily: 'Outfit, sans-serif',
@@ -132,14 +136,10 @@ export default function PreferencesPage() {
             fontWeight: 900, color: '#0c1b33', marginBottom: 12,
             letterSpacing: '-0.02em',
           }}>
-            {prefs.planningType === 'mood' ? (
-              <>Curate your <span className="text-gradient-duo">experience</span></>
-            ) : (
-              <>Curate your <span className="text-gradient-duo">{prefs.destination}</span> experience</>
-            )}
+            Curate your <span className="text-gradient-duo">{prefs.destination}</span> experience
           </h1>
-          <p style={{ color: '#5b8bad', fontSize: '1.1rem', maxWidth: 600, margin: '0 auto' }}>
-            Select your vibe, set your budget, and choose your duration. We'll handcraft the perfect itinerary.
+          <p style={{ color: '#3f7295', fontSize: '1.1rem', maxWidth: 600, margin: '0 auto' }}>
+            Set your budget and duration for {prefs.destination}. We'll handcraft the perfect itinerary.
           </p>
         </div>
 
@@ -156,7 +156,7 @@ export default function PreferencesPage() {
               </svg>
               What's your travel vibe?
             </h2>
-            <p style={{ color: '#5b8bad', fontSize: '0.95rem', marginBottom: 24 }}>
+            <p style={{ color: '#3f7295', fontSize: '0.95rem', marginBottom: 24 }}>
               {selectedMood.description}
             </p>
 
@@ -215,7 +215,7 @@ export default function PreferencesPage() {
                   </svg>
                   What's your total budget?
                 </h2>
-                <p style={{ color: '#5b8bad', fontSize: '0.95rem' }}>
+                <p style={{ color: '#3f7295', fontSize: '0.95rem' }}>
                   Includes flights, stays, food, and activities.
                 </p>
               </div>
@@ -260,8 +260,8 @@ export default function PreferencesPage() {
                 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-                <span style={{ color: '#5b8bad', fontSize: '0.85rem', fontWeight: 600 }}>₹5,000</span>
-                <span style={{ color: '#5b8bad', fontSize: '0.85rem', fontWeight: 600 }}>₹5,00,000+</span>
+                <span style={{ color: '#3f7295', fontSize: '0.85rem', fontWeight: 600 }}>₹5,000</span>
+                <span style={{ color: '#3f7295', fontSize: '0.85rem', fontWeight: 600 }}>₹5,00,000+</span>
               </div>
             </div>
 
@@ -304,7 +304,7 @@ export default function PreferencesPage() {
               </svg>
               How many days?
             </h2>
-            <p style={{ color: '#5b8bad', fontSize: '0.95rem', marginBottom: 24 }}>
+            <p style={{ color: '#3f7295', fontSize: '0.95rem', marginBottom: 24 }}>
               We'll craft a structured, day-by-day plan.
             </p>
 
@@ -330,7 +330,7 @@ export default function PreferencesPage() {
                     }}
                   >
                     {d}
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, marginTop: 4, color: active ? '#ec4899' : '#5b8bad' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, marginTop: 4, color: active ? '#ec4899' : '#3f7295' }}>
                       {d === 1 ? 'DAY' : 'DAYS'}
                     </div>
                   </button>
@@ -357,7 +357,7 @@ export default function PreferencesPage() {
                     fontWeight: 900, fontSize: '1.2rem', color: '#2d5474'
                   }}
                 />
-                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#5b8bad' }}>CUSTOM</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#3f7295' }}>CUSTOM</div>
               </div>
             </div>
 
@@ -400,7 +400,7 @@ export default function PreferencesPage() {
             </div>
             <div>
               <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#6d28d9' }}>Deep AI Mode — Active</div>
-              <div style={{ color: '#5b8bad', fontSize: '0.88rem', marginTop: 2 }}>Powered by your local Ollama OSS model for rich, detailed itineraries.</div>
+              <div style={{ color: '#3f7295', fontSize: '0.88rem', marginTop: 2 }}>Powered by your local Ollama OSS model for rich, detailed itineraries.</div>
             </div>
           </div>
 
@@ -452,7 +452,7 @@ export default function PreferencesPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={state.loading || (prefs.planningType === 'detailed' && prefs.destination.trim().length < 1)}
+            disabled={state.loading || !hasDestination}
             className="btn btn-pink btn-lg"
             style={{
               width: '100%', borderRadius: 20, fontSize: '1.15rem', padding: '20px',

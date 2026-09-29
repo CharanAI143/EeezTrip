@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
+import { Mic, MicOff, Loader2, CheckCircle2 } from 'lucide-react';
 import { voiceAssistant } from '../lib/voice';
 import { extractTripDataFromVoice } from '../lib/gemini';
 

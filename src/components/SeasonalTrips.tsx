@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, MapPin, Globe, Compass, ChevronRight, Loader2, Camera, CloudSun, Leaf, Snowflake, Sun } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Sparkles, MapPin, Globe, Compass, Loader2, Leaf, Snowflake, Sun } from 'lucide-react';
 import { getSeasonalRecommendations } from '../lib/gemini';
 
 import { SmartImage } from './SmartImage';
@@ -26,7 +26,6 @@ interface SeasonalTripsProps {
 export function SeasonalTrips({ userLocation = "New York", onSelectDestination }: SeasonalTripsProps) {
   const [data, setData] = useState<SeasonalData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'nearby' | 'national' | 'global'>('nearby');
 
   useEffect(() => {
     async function load() {
@@ -42,12 +41,6 @@ export function SeasonalTrips({ userLocation = "New York", onSelectDestination }
     }
     load();
   }, [userLocation]);
-
-  const tabs = [
-    { id: 'nearby', label: 'Nearby & State', icon: MapPin },
-    { id: 'national', label: 'Across Country', icon: Compass },
-    { id: 'global', label: 'Around the World', icon: Globe },
-  ] as const;
 
   const monthName = new Date().toLocaleString('default', { month: 'long' });
 
@@ -69,8 +62,6 @@ export function SeasonalTrips({ userLocation = "New York", onSelectDestination }
   }
 
   if (!data) return null;
-
-  const currentDestinations = data[activeTab];
 
   return (
     <div className="bg-white rounded-[3rem] border border-brand-border p-8 md:p-12 relative overflow-hidden shadow-sm">

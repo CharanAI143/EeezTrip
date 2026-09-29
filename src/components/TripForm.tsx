@@ -3,8 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { TripFormSchema, type TripFormData, TravelStyle, Currency, Preference, TripType } from '../types';
 import { cn } from '../lib/utils';
-import { Plane, Calendar, Wallet, Users, Compass, FileText, MapPin, Sparkles } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Sparkles } from 'lucide-react';
 import { VoiceFormFiller } from './VoiceFormFiller';
 
 interface TripFormProps {
@@ -34,8 +33,6 @@ export function TripForm({ onSubmit, isLoading }: TripFormProps) {
   const selectedPreferences = watch('preferences');
   const selectedTripTypes = watch('tripTypes');
   const duration = watch('duration');
-  const budget = watch('budget');
-  const currency = watch('currency');
 
   useEffect(() => {
     const handlePrefill = (e: any) => {

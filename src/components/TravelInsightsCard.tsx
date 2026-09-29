@@ -80,7 +80,7 @@ export const TravelInsightsCard: React.FC<Props> = ({ destination }) => {
           <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.1rem', color: '#0c1b33', margin: 0 }}>
             Travel Intelligence & Insights
           </h3>
-          <span style={{ fontSize: '0.82rem', color: '#5b8bad' }}>
+          <span style={{ fontSize: '0.82rem', color: '#3f7295' }}>
             Real-time environmental, transit, and venue advisories for {destination}
           </span>
         </div>

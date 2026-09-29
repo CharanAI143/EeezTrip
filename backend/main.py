@@ -7,20 +7,13 @@ from typing import List, Dict, Optional, Any
 import random
 import json
 import io
-import os
 import re
 import datetime
 from contextlib import asynccontextmanager
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-try:
-    import ollama
-    HAS_OLLAMA = True
-except ImportError:
-    HAS_OLLAMA = False
-    print("[WARN] ollama package not installed — Ollama endpoints will be unavailable.")
+from concurrent.futures import ThreadPoolExecutor
 import requests
+from urllib.parse import quote
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 load_dotenv()
 
@@ -51,6 +44,15 @@ _mongo_db: Any = None
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _mongo_client, _mongo_db
+
+    # The v1 service layer resolves its Mongo connection through DatabaseManager,
+    # so it must be connected too or those endpoints silently skip persistence.
+    try:
+        from backend.app.core.database import db_manager
+        await db_manager.connect()
+    except Exception as exc:
+        print(f"[DatabaseManager] Connect note: {exc}")
+
     if HAS_MONGO and MONGO_URI:
         try:
             _mongo_client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=8000, tlsCAFile=certifi.where())
@@ -82,6 +84,12 @@ async def lifespan(application: FastAPI):
         _mongo_client.close()
         print("[MongoDB] Connection closed.")
 
+    try:
+        from backend.app.core.database import db_manager
+        await db_manager.disconnect()
+    except Exception as exc:
+        print(f"[DatabaseManager] Disconnect note: {exc}")
+
 
 def get_db():
     if _mongo_db is None:
@@ -96,14 +104,6 @@ def _id_to_str(doc: dict) -> dict:
     return doc
 
 app = FastAPI(title="EeezTrip API", version="2.0.0", lifespan=lifespan)
-
-LOCAL_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:31b-cloud").strip() or "gemma4:31b-cloud"
-DEEP_MODE_TIMEOUT_SEC = int(os.getenv("DEEP_MODE_TIMEOUT_SEC", "12"))
-
-# Gemini Configuration
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
 
 try:
     import multipart  # type: ignore # noqa: F401
@@ -127,6 +127,13 @@ app.include_router(api_v1_router, prefix="/api/v1")
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from get_images import get_place_images
+from backend.app.utils.http_client import (
+    extract_price,
+    extract_snippets,
+    fetch_with_retry,
+    first_organic_link,
+    serpapi_search,
+)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -233,8 +240,9 @@ class BookingRequest(BaseModel):
 class AlternativePlanRequest(BaseModel):
     destination: str
     condition: str
-    mood: str
-    check_out: str
+    mood: str = "Relaxed"
+    # Optional stay context; the client only sends destination/condition/mood.
+    check_out: str = ""
     guests: int = 1
     hotel: str = ""
     transport_mode: str = ""
@@ -644,220 +652,6 @@ async def collaboration_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         print(f"[WebSocket] Session {session_id} disconnected")
 
-def is_ollama_available() -> bool:
-    """Check if local Ollama instance is responsive."""
-    if not HAS_OLLAMA:
-        return False
-    try:
-        # Pinging tags is a lightweight way to check health
-        ollama.list()
-        return True
-    except Exception:
-        return False
-
-def gemini_generate_trip(req: TripRequest) -> TripResponse:
-    """Fallback generator using Google Gemini."""
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not configured for fallback.")
-    
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    date_context = f"from {req.start_date} to {req.end_date}" if req.start_date and req.end_date else ""
-    
-    prompt = f"""You are an expert luxury travel planner. Create a {req.days}-day trip {date_context}.
-Origin: {req.origin or 'Not set'}
-Destination: {req.destination or 'Pick the best based on mood'}
-Mood: {req.mood}
-Budget: ₹{req.budget:,} INR
-
-Return a valid JSON object matching this schema exactly:
-{{
-  "destination": "string",
-  "title": "string",
-  "tagline": "string",
-  "summary": "string",
-  "best_time": "string",
-  "highlights": ["string", "string", "string"],
-  "daily_plan": [
-    {{
-      "day": 1,
-      "title": "string",
-      "morning": "string",
-      "midday": "string",
-      "afternoon": "string",
-      "evening": "string",
-      "tip": "string"
-    }}
-  ],
-  "cozy_tips": ["string", "string", "string"],
-  "must_try_food": ["string", "string", "string"],
-  "estimated_cost_breakdown": {{
-    "accommodation": integer,
-    "food": integer,
-    "transport": integer,
-    "activities": integer,
-    "misc": integer
-  }}
-}}
-Rules:
-1. JSON ONLY, no markdown.
-2. cost_breakdown must sum to {req.budget}.
-"""
-    response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
-    data = json.loads(response.text)
-    return TripResponse(**data)
-
-def gemini_chat(messages: List[ChatMessage]) -> str:
-    """Fallback chat using Google Gemini."""
-    if not GEMINI_API_KEY:
-        return "I'm sorry, I'm having trouble connecting to my AI services right now."
-    
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    
-    # Simple conversion of messages to Gemini format
-    system_instruction = "You are EeezTrip's travel assistant. Keep answers concise, practical, and friendly."
-    full_prompt = f"System Instruction: {system_instruction}\n\n"
-    for m in messages[-5:]:
-        full_prompt += f"{m.role}: {m.content}\n"
-    
-    response = model.generate_content(full_prompt)
-    return response.text.strip()
-
-
-def ollama_generate_trip(req: TripRequest) -> TripResponse:
-    date_context = ""
-    if req.start_date and req.end_date:
-        date_context = f"The trip is from {req.start_date} to {req.end_date}. "
-    elif req.start_date:
-        date_context = f"The trip starts on {req.start_date}. "
-
-    prompt = f"""You are an expert luxury travel planner. The user wants a {req.days}-day trip from {req.origin or 'their location'}.
-{date_context}Their mood/style is {req.mood} and their total budget is ₹{req.budget:,} INR.
-
-{f"The destination is {req.destination}." if req.destination else "Please choose the PERFECT destination for them based on their mood and budget!"}
-
-Generate a detailed, authentic, and immersive itinerary. 
-You MUST respond with a valid JSON object matching this schema perfectly:
-{{
-  "destination": "string (The chosen destination name, e.g. 'Bali')",
-  "title": "string (Catchy, authentic title)",
-  "tagline": "string (Short evocative tagline)",
-  "summary": "string (A paragraph summarizing the trip, referencing origin, destination, mood, and budget)",
-  "best_time": "string (Best time of year to visit, considering seasons and weather)",
-  "highlights": ["string", "string", "string"],
-  "daily_plan": [
-    {{
-      "day": 1,
-      "title": "string (Descriptive title for the day's theme)",
-      "morning": "string (6:00 AM - 11:30 AM: Specific place, activity, duration, and why it's worth it)",
-      "midday": "string (11:30 AM - 2:30 PM: Lunch at a specific restaurant/area, activity, and travel time if any)",
-      "afternoon": "string (2:30 PM - 6:00 PM: Specific place, activity, duration, and practical details like opening hours)",
-      "evening": "string (6:00 PM - 10:00 PM: Dinner and leisure activity at a specific location, authentic local experience)",
-      "tip": "string (Insider tip, reservation advice, or advance booking recommendation)"
-    }}
-  ],
-  "cozy_tips": ["string (Practical travel details)", "string", "string"],
-  "must_try_food": ["string (Local delicacies with brief description)", "string", "string"],
-  "estimated_cost_breakdown": {{
-    "accommodation": integer,
-    "food": integer,
-    "transport": integer,
-    "activities": integer,
-    "misc": integer
-  }}
-}}
-
-Important Planning Rules:
-1. SPECIFICITY: Use actual place names, landmarks, and restaurants. No generic descriptions.
-2. TIMING: Include specific time ranges (e.g., 9:00 AM - 12:00 PM) for each block.
-3. LOGIC: Minimize travel time between locations. Ensure a logical geographic flow to avoid backtracking.
-4. VARIETY: Mix popular highlights with genuine local gems. Balance active exploration with rest.
-5. PRACTICALITY: Mention estimated durations, travel times, and advance booking needs where relevant.
-6. FORMAT: ONLY return the JSON object, no extra text or markdown code blocks.
-7. BUDGET: Values in estimated_cost_breakdown MUST sum to exactly {req.budget} (integers).
-"""
-    try:
-        model = resolve_ollama_model(LOCAL_OLLAMA_MODEL)
-        response = ollama.chat(
-            model=model,
-            messages=[{'role': 'user', 'content': prompt}],
-            format='json',
-            options={
-                "temperature": 0.5,
-                "num_predict": 600,
-            }
-        )
-        data = json.loads(response['message']['content'])
-        return TripResponse(**data)
-    except Exception as e:
-        print(f"Ollama generation failed: {e}")
-        raise HTTPException(status_code=500, detail=f"AI generation failed. Please ensure Ollama is running and a local model is available.")
-
-
-def ollama_chat(messages: List[ChatMessage]) -> str:
-    system_prompt = (
-        "You are EeezTrip's travel assistant. Keep answers concise, practical, and friendly. "
-        "Focus on travel planning, destinations, budgets, transport, visas, and safety tips."
-    )
-
-    # Keep only the latest conversation turns to reduce latency.
-    recent_messages = messages[-6:]
-    formatted_messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    for message in recent_messages:
-        role = message.role if message.role in {"user", "assistant", "system"} else "user"
-        formatted_messages.append({"role": role, "content": message.content[:700]})
-
-    chat_model = os.getenv("OLLAMA_CHAT_MODEL", LOCAL_OLLAMA_MODEL).strip() or LOCAL_OLLAMA_MODEL
-    chat_model = resolve_ollama_model(chat_model)
-
-    try:
-        response = ollama.chat(
-            model=chat_model,
-            messages=formatted_messages,
-            options={
-                "temperature": 0.3,
-                "top_p": 0.9,
-            },
-        )
-        content = response.get("message", {}).get("content", "").strip()
-        if not content:
-            raise ValueError("Empty response from model")
-        return content
-    except Exception as e:
-        print(f"Ollama chat failed: {e}")
-        last_user_message = ""
-        for message in reversed(messages):
-            if message.role == "user":
-                last_user_message = message.content.strip()
-                break
-        fallback = (
-            "I could not reach the AI model right now. "
-            "Please verify Ollama is running and the selected model is available. "
-            "You can still continue by sharing destination, budget, and days, and I will help structure your plan."
-        )
-        if last_user_message:
-            fallback = (
-                f"I am having trouble connecting to the model right now, but I understood your request: "
-                f"\"{last_user_message[:160]}\". "
-                "Please try once more in a moment."
-            )
-        return fallback
-
-
-def resolve_ollama_model(preferred_model: str) -> str:
-    try:
-        model_data = ollama.list()
-        models = model_data.get("models", [])
-        names = [m.get("name", "") for m in models if isinstance(m, dict)]
-        if preferred_model in names:
-            return preferred_model
-        for name in names:
-            if name:
-                return name
-    except Exception as e:
-        print(f"Unable to resolve Ollama model list: {e}")
-    return preferred_model
-
-
 def build_fast_trip(req: TripRequest) -> TripResponse:
     destination = req.destination.strip()
     mood_key = req.mood.strip().lower()
@@ -928,47 +722,28 @@ def _generate_mock_price_and_rating(origin: str, destination: str, mode: str) ->
 def scrape_transport_price(origin: str, destination: str, mode: str) -> TransportOption:
     api_key = os.getenv("SERPAPI_API_KEY", "").strip()
     mock_price, mock_rating = _generate_mock_price_and_rating(origin, destination, mode)
-    mmt_url = f"https://www.makemytrip.com/flights/"
-    
-    if api_key:
-        query = f"{origin} to {destination} {mode} fare INR"
-        try:
-            res = requests.get(
-                "https://serpapi.com/search.json",
-                params={"engine": "google", "q": query, "api_key": api_key},
-                timeout=10
+    mmt_url = "https://www.makemytrip.com/flights/"
+
+    data = serpapi_search(f"{origin} to {destination} {mode} fare INR", api_key)
+    if data:
+        for snippet in extract_snippets(data):
+            best_price = extract_price(snippet)
+            if best_price is None:
+                continue
+            clean_snippet = re.sub(r"\s+", " ", snippet).strip()
+            return TransportOption(
+                mode=mode.title(),
+                provider="SerpApi",
+                route=f"{origin} → {destination}",
+                price_inr=best_price,
+                source="Google Search",
+                source_url=first_organic_link(data, mmt_url),
+                snippet=clean_snippet[:220],
+                rating=mock_rating,
             )
-            res.raise_for_status()
-            data = res.json()
-            
-            snippets = []
-            if "answer_box" in data and "snippet" in data["answer_box"]:
-                snippets.append(data["answer_box"]["snippet"])
-            for result in data.get("organic_results", [])[:3]:
-                if "snippet" in result:
-                    snippets.append(result["snippet"])
-            
-            for snippet in snippets:
-                clean_snippet = re.sub(r"\s+", " ", snippet).strip()
-                price_match = re.search(r"(?:₹|INR|Rs\.?)\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]{3,7})", clean_snippet, re.IGNORECASE)
-                if price_match:
-                    best_price = int(price_match.group(1).replace(",", ""))
-                    return TransportOption(
-                        mode=mode.title(),
-                        provider="SerpApi",
-                        route=f"{origin} → {destination}",
-                        price_inr=best_price,
-                        source="Google Search",
-                        source_url=data.get("organic_results", [{}])[0].get("link", mmt_url),
-                        snippet=clean_snippet[:220],
-                        rating=mock_rating,
-                    )
-        except Exception as e:
-            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
-                print("SerpApi key unauthorized for transport. Using mock data.")
-            else:
-                print(f"SerpApi transport error: {e}")
-            
+    elif api_key:
+        print("SerpApi transport lookup failed or returned no price; using estimate.")
+
     # Fallback to mock price
     return TransportOption(
         mode=mode.title(),
@@ -985,45 +760,26 @@ def scrape_transport_price(origin: str, destination: str, mode: str) -> Transpor
 def scrape_hotel_price(destination: str) -> HotelOption:
     api_key = os.getenv("SERPAPI_API_KEY", "").strip()
     mock_price, mock_rating = _generate_mock_price_and_rating(destination, destination, "hotel")
-    booking_url = f"https://www.booking.com/searchresults.html?ss={requests.utils.quote(destination)}"
-    
-    if api_key:
-        query = f"{destination} hotel price per night INR"
-        try:
-            res = requests.get(
-                "https://serpapi.com/search.json",
-                params={"engine": "google", "q": query, "api_key": api_key},
-                timeout=10
+    booking_url = f"https://www.booking.com/searchresults.html?ss={quote(destination)}"
+
+    data = serpapi_search(f"{destination} hotel price per night INR", api_key)
+    if data:
+        for snippet in extract_snippets(data):
+            best_price = extract_price(snippet)
+            if best_price is None:
+                continue
+            clean_snippet = re.sub(r"\s+", " ", snippet).strip()
+            return HotelOption(
+                provider="SerpApi",
+                destination=destination,
+                price_inr=best_price,
+                source="Google Search",
+                source_url=first_organic_link(data, booking_url),
+                snippet=clean_snippet[:220],
+                rating=mock_rating,
             )
-            res.raise_for_status()
-            data = res.json()
-            
-            snippets = []
-            if "answer_box" in data and "snippet" in data["answer_box"]:
-                snippets.append(data["answer_box"]["snippet"])
-            for result in data.get("organic_results", [])[:3]:
-                if "snippet" in result:
-                    snippets.append(result["snippet"])
-            
-            for snippet in snippets:
-                clean_snippet = re.sub(r"\s+", " ", snippet).strip()
-                price_match = re.search(r"(?:₹|INR|Rs\.?)\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]{3,7})", clean_snippet, re.IGNORECASE)
-                if price_match:
-                    best_price = int(price_match.group(1).replace(",", ""))
-                    return HotelOption(
-                        provider="SerpApi",
-                        destination=destination,
-                        price_inr=best_price,
-                        source="Google Search",
-                        source_url=data.get("organic_results", [{}])[0].get("link", booking_url),
-                        snippet=clean_snippet[:220],
-                        rating=mock_rating,
-                    )
-        except Exception as e:
-            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
-                print("SerpApi key unauthorized for hotel. Using mock data.")
-            else:
-                print(f"SerpApi hotel error: {e}")
+    elif api_key:
+        print("SerpApi hotel lookup failed or returned no price; using estimate.")
 
     # Fallback to mock price
     return HotelOption(
@@ -1037,120 +793,68 @@ def scrape_hotel_price(destination: str) -> HotelOption:
     )
 
 
-def ollama_revise_trip(req: PlanRevisionRequest) -> TripResponse:
-    current_plan_json = json.dumps(req.current_plan.model_dump(), ensure_ascii=False)
-    prompt = f"""You are an expert travel planner editing an existing itinerary.
-User preferences:
-- Origin: {req.preferences.origin or 'Not set'}
-- Destination: {req.preferences.destination}
-- Mood: {req.preferences.mood}
-- Budget: INR {req.preferences.budget}
-- Days: {req.preferences.days}
-
-Current itinerary JSON:
-{current_plan_json}
-
-User change request:
-{req.instruction}
-
-Return ONLY a valid JSON object matching this schema:
-{{
-  "title": "string",
-  "tagline": "string",
-  "summary": "string",
-  "best_time": "string",
-  "highlights": ["string", "string", "string"],
-  "daily_plan": [
-    {{
-      "day": 1,
-      "title": "string",
-      "morning": "string",
-      "afternoon": "string",
-      "evening": "string",
-      "tip": "string"
-    }}
-  ],
-  "cozy_tips": ["string", "string", "string"],
-  "must_try_food": ["string", "string", "string"],
-  "estimated_cost_breakdown": {{
-    "accommodation": integer,
-    "food": integer,
-    "transport": integer,
-    "activities": integer,
-    "misc": integer
-  }}
-}}
-
-Rules:
-1. Keep the same number of days ({req.preferences.days}).
-2. Respect the user's latest change request.
-3. Cost breakdown must sum exactly to {req.preferences.budget}.
-4. Return only raw JSON, no markdown.
-"""
-    model = resolve_ollama_model(LOCAL_OLLAMA_MODEL)
-    response = ollama.chat(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        format="json",
-        options={"temperature": 0.35, "num_predict": 2500},
-    )
-    data = json.loads(response["message"]["content"])
-    return TripResponse(**data)
-
-
 @app.post("/api/recommend", response_model=TripResponse)
 def recommend_trip(req: TripRequest):
-    trip = None
-    if req.mode == "deep":
-        # Orchestration logic: Try Ollama first, fallback to Gemini
-        if is_ollama_available():
-            try:
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(ollama_generate_trip, req)
-                    trip = future.result(timeout=DEEP_MODE_TIMEOUT_SEC)
-            except Exception as e:
-                print(f"Ollama deep generation failed, falling back to Gemini: {e}")
-                if GEMINI_API_KEY:
-                    try:
-                        trip = gemini_generate_trip(req)
-                    except Exception as ge:
-                        print(f"Gemini fallback failed: {ge}")
-                        trip = build_fast_trip(req)
-                else:
-                    trip = build_fast_trip(req)
-        elif GEMINI_API_KEY:
-            print("Ollama unavailable, using Gemini for deep mode.")
-            try:
-                trip = gemini_generate_trip(req)
-            except Exception as e:
-                print(f"Gemini generation failed: {e}")
-                trip = build_fast_trip(req)
-        else:
-            print("No AI services available, using template generator.")
-            trip = build_fast_trip(req)
-    else:
+    from backend.app.services.ai_orchestrator import AIOrchestrator
+    from backend.app.schemas.trip import TripRequest as SchemaTripRequest
+    from backend.app.services.trip_recommendation_service import TripRecommendationService
+
+    # Normal mode keeps the fast deterministic template; deep mode goes through the
+    # LLM provider chain, which itself falls back deterministically on failure.
+    if req.mode != "deep":
         trip = build_fast_trip(req)
+    else:
+        schema_req = SchemaTripRequest(
+            origin=req.origin,
+            destination=req.destination,
+            mood=req.mood,
+            budget=req.budget,
+            days=req.days,
+            startDate=req.start_date,
+            endDate=req.end_date,
+            mode=req.mode,
+        )
+        trip = AIOrchestrator().generate_trip_recommendation(schema_req)
+        TripRecommendationService()._align_cost_breakdown(trip, req.budget)
+        TripRecommendationService()._align_day_count(trip, req.days)
 
-    # Sync the final estimated cost breakdown with real live pricing from SerpApi
-    try:
-        final_dest = trip.destination or req.destination
-        if final_dest:
-            hotel_opts = get_hotel_prices(final_dest)
-            valid_hotels = [h.price_inr for h in hotel_opts if h.price_inr]
-            if valid_hotels:
-                avg_hotel = sum(valid_hotels) / len(valid_hotels)
-                trip.estimated_cost_breakdown.accommodation = int(avg_hotel * req.days)
-                
-        if req.origin and final_dest:
-            transport_opts = get_transport_prices(req.origin, final_dest)
-            valid_transports = [t.price_inr for t in transport_opts if t.price_inr]
-            if valid_transports:
-                avg_transport = sum(valid_transports) / len(valid_transports)
-                trip.estimated_cost_breakdown.transport = int(avg_transport * 2)
-    except Exception as e:
-        print(f"Failed to sync live prices to budget: {e}")
-
+    _apply_live_pricing(trip, req)
     return trip
+
+
+def _apply_live_pricing(trip: TripResponse, req: TripRequest) -> None:
+    """Blend live SerpApi prices into the cost breakdown while preserving the budget total."""
+    from backend.app.services.trip_recommendation_service import TripRecommendationService
+
+    final_dest = trip.destination or req.destination
+    if not final_dest:
+        return
+
+    days = max(1, min(req.days, 14))
+    cb = trip.estimated_cost_breakdown
+    try:
+        valid_hotels = [h.price_inr for h in get_hotel_prices(final_dest) if h.price_inr]
+        if valid_hotels:
+            avg_hotel = int(sum(valid_hotels) / len(valid_hotels))
+            # Two travellers sharing a room for the stay.
+            cb.accommodation = max(0, avg_hotel * days)
+    except Exception as exc:
+        print(f"Live hotel pricing unavailable: {exc}")
+
+    try:
+        if req.origin:
+            valid_transports = [
+                t.price_inr for t in get_transport_prices(req.origin, final_dest) if t.price_inr
+            ]
+            if valid_transports:
+                avg_transport = int(sum(valid_transports) / len(valid_transports))
+                # Return journey plus local transit.
+                cb.transport = max(0, avg_transport * 2)
+    except Exception as exc:
+        print(f"Live transport pricing unavailable: {exc}")
+
+    # Live prices may overshoot the budget, so re-normalise the split afterwards.
+    TripRecommendationService()._align_cost_breakdown(trip, req.budget)
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -1158,29 +862,88 @@ def chat(req: ChatRequest):
     if not req.messages:
         raise HTTPException(status_code=400, detail="At least one chat message is required.")
     
-    # Orchestration logic for Chat
-    if is_ollama_available():
-        reply = ollama_chat(req.messages)
-        # If ollama returned a fallback message, we might want to try Gemini instead
-        if "I could not reach the AI model" in reply and GEMINI_API_KEY:
-             reply = gemini_chat(req.messages)
-    elif GEMINI_API_KEY:
-        reply = gemini_chat(req.messages)
-    else:
-        reply = "I'm currently in offline mode. I can help with basic navigation, but full AI chat is unavailable."
-        
+    reply = _orchestrate_chat(req.messages)
     return ChatResponse(reply=reply)
 
 
+def _orchestrate_chat(messages: List[ChatMessage]) -> str:
+    """Try each available chat provider in turn, returning the first real reply."""
+    from backend.app.providers.ai.factory import AIProviderFactory
+
+    system_instruction = (
+        "You are EeezTrip's travel assistant. Keep answers concise, practical, and friendly. "
+        "Focus on travel planning, destinations, budgets, transport, visas, and safety tips."
+    )
+    recent = [
+        {
+            "role": m.role if m.role in {"user", "assistant", "system"} else "user",
+            "content": m.content[:2000],
+        }
+        for m in messages[-8:]
+    ]
+
+    for provider_name in AIProviderFactory.provider_chain():
+        try:
+            provider = AIProviderFactory.get_provider(provider_name)
+            if not provider.is_available():
+                continue
+            # generate_text is not schema-driven for chat, so bypass the JSON coercion.
+            reply = provider.generate_text(
+                _flatten_for_chat(system_instruction, recent), system_instruction
+            )
+            if reply and reply.strip():
+                return reply.strip()
+        except Exception as exc:
+            print(f"[Chat] Provider '{provider_name}' failed: {exc}")
+
+    return (
+        "I'm currently offline and can't reach my AI services. I can still help you "
+        "structure a plan — tell me your destination, budget, and trip length."
+    )
+
+
+def _flatten_for_chat(system_instruction: str, messages: List[Dict[str, str]]) -> str:
+    lines = [f"System: {system_instruction}", ""]
+    for message in messages:
+        lines.append(f"{message['role'].capitalize()}: {message['content']}")
+    lines.append("Assistant:")
+    return "\n".join(lines)
+
+
 @app.post("/api/recommend/revise", response_model=TripResponse)
-def revise_recommendation(req: PlanRevisionRequest):
+async def revise_recommendation(req: PlanRevisionRequest):
+    """Legacy flat TripResponse wrapper around the v1 revision service."""
+    from backend.app.schemas.trip import (
+        PlanRevisionRequest as SchemaRevisionRequest,
+        PlanRevisionResponse,
+    )
+    from backend.app.services.trip_revision_service import TripRevisionService
+
+    schema_req = SchemaRevisionRequest(
+        preferences={
+            "origin": req.preferences.origin,
+            "destination": req.preferences.destination,
+            "mood": req.preferences.mood,
+            "budget": req.preferences.budget,
+            "days": req.preferences.days,
+            "startDate": req.preferences.start_date,
+            "endDate": req.preferences.end_date,
+            "mode": req.preferences.mode,
+        },
+        current_plan=req.current_plan.model_dump(),
+        instruction=req.instruction,
+    )
     try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(ollama_revise_trip, req)
-            return future.result(timeout=max(150, DEEP_MODE_TIMEOUT_SEC))
-    except Exception as e:
-        print(f"Plan revision failed: {e}")
-        raise HTTPException(status_code=500, detail="Plan revision failed. Please try rephrasing your requested change.")
+        response: PlanRevisionResponse = await TripRevisionService().revise_trip(schema_req)
+        return response.revised_plan
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        print(f"Plan revision failed: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="Plan revision failed. Please try rephrasing your requested change.",
+        )
 
 
 if HAS_MULTIPART:
@@ -1228,20 +991,27 @@ else:
 def get_weather(place: str = Query(..., min_length=2)):
     """Fetch live weather forecast using Open-Meteo."""
     try:
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={place}&count=1"
-        geo_resp = requests.get(geo_url, timeout=5)
-        geo_data = geo_resp.json()
-        
+        geo_data = fetch_with_retry(
+            f"https://geocoding-api.open-meteo.com/v1/search?name={quote(place)}&count=1",
+            timeout=5,
+        )
+        if not geo_data:
+            raise RuntimeError("geocoding lookup failed")
+
         if not geo_data.get("results"):
-            return {"temperature_max": 28.5, "temperature_min": 20.0, "condition": "Partly cloudy", "is_day": 1}
+            return {"temperature_max": 28.5, "temperature_min": 20.0, "condition": "Partly cloudy", "is_day": 1, "needs_alternatives": False}
             
         lat = geo_data["results"][0]["latitude"]
         lon = geo_data["results"][0]["longitude"]
         
-        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,is_day,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
-        w_resp = requests.get(weather_url, timeout=5)
-        w_data = w_resp.json()
-        
+        w_data = fetch_with_retry(
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,is_day,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto",
+            timeout=5,
+        )
+        if not w_data:
+            raise RuntimeError("weather lookup failed")
+
         current = w_data.get("current", {})
         daily = w_data.get("daily", {})
         
@@ -1287,7 +1057,7 @@ def get_weather(place: str = Query(..., min_length=2)):
         }
     except Exception as e:
         print(f"Weather error: {e}")
-        return {"temperature_max": 26.0, "temperature_min": 18.0, "condition": "Sunny", "is_day": 1}
+        return {"temperature_max": 26.0, "temperature_min": 18.0, "condition": "Sunny", "is_day": 1, "needs_alternatives": False}
 
 
 @app.post("/api/weather/alternatives")
@@ -1299,32 +1069,35 @@ Suggest 3-4 specific indoor or weather-safe alternative activities they can do i
 Keep the suggestions aligned with their '{req.mood}' vibe if possible.
 Return a simple JSON list of strings under the key 'alternatives'."""
 
-    try:
-        # Use Ollama for the suggestion
-        response = ollama.chat(
-            model="llama3",
-            messages=[{"role": "user", "content": prompt}],
-            format="json"
-        )
-        content = response["message"]["content"]
-        # Basic cleanup in case of markdown blocks
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
-            
-        return json.loads(content)
-    except Exception as e:
-        print(f"Alternatives error: {e}")
-        # Generic fallbacks
-        return {
-            "alternatives": [
-                f"Explore the local museums and art galleries in {req.destination}",
-                "Find a cozy boutique café or a historic library to unwind",
-                "Visit a local indoor market or shopping arcade",
-                "Treat yourself to a spa day or indoor wellness center"
-            ]
-        }
+    from backend.app.providers.ai.factory import AIProviderFactory, BaseLLMProvider
+
+    for provider_name in AIProviderFactory.provider_chain():
+        try:
+            provider = AIProviderFactory.get_provider(provider_name)
+            if not provider.is_available():
+                continue
+            payload = provider.generate_structured_json(
+                prompt,
+                {"alternatives": "array of 3-4 short strings"},
+            )
+            alternatives = payload.get("alternatives")
+            if isinstance(alternatives, list) and alternatives:
+                return {
+                    "alternatives": [
+                        str(item).strip() for item in alternatives if str(item).strip()
+                    ][:5]
+                }
+        except Exception as e:
+            print(f"Weather alternatives provider '{provider_name}' failed: {e}")
+
+    return {
+        "alternatives": [
+            f"Explore the local museums and art galleries in {req.destination}",
+            "Find a cozy boutique café or a historic library to unwind",
+            "Visit a local indoor market or shopping arcade",
+            "Treat yourself to a spa day or indoor wellness center",
+        ]
+    }
 
 # ─── MongoDB CRUD Endpoints ───────────────────────────────────────────────────
 

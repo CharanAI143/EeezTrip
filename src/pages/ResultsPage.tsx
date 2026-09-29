@@ -21,7 +21,6 @@ const MOOD_ALTERNATIVES: Record<string, string[]> = {
   'Nature': ['Wayanad', 'Coorg', 'Ooty'],
   'Foodie': ['Amritsar', 'Jaipur', 'Lucknow'],
 };
-const CHEAP_DESTINATIONS = Object.values(MOOD_ALTERNATIVES).flat();
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -133,7 +132,7 @@ function DayCard({ day }: { day: DayPlan }) {
               {day.title}
             </div>
             {!open && (
-              <div style={{ color: '#5b8bad', fontSize: '0.85rem', marginTop: 4, fontWeight: 500 }}>
+              <div style={{ color: '#3f7295', fontSize: '0.85rem', marginTop: 4, fontWeight: 500 }}>
                 Click to expand itinerary
               </div>
             )}
@@ -281,7 +280,7 @@ export default function ResultsPage() {
         <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.5rem', color: '#0c1b33', fontWeight: 800 }}>
           Crafting your alternative trip...
         </h2>
-        <p style={{ color: '#5b8bad', marginTop: 8 }}>Please wait a few moments.</p>
+        <p style={{ color: '#3f7295', marginTop: 8 }}>Please wait a few moments.</p>
       </div>
     );
   }
@@ -327,7 +326,7 @@ export default function ResultsPage() {
         <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.8rem', fontWeight: 800, color: '#0c1b33', marginBottom: 12 }}>
           No itinerary crafted yet
         </h2>
-        <p style={{ color: '#5b8bad', marginBottom: 32, fontSize: '1.1rem', maxWidth: 400 }}>
+        <p style={{ color: '#3f7295', marginBottom: 32, fontSize: '1.1rem', maxWidth: 400 }}>
           Set your preferences and let our AI curate the perfect travel experience for you.
         </p>
         <button className="btn btn-primary" onClick={() => navigate('start')} style={{ borderRadius: 999, padding: '14px 32px' }}>

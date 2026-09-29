@@ -1,0 +1,41 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eeeztrip-api:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Default OLLAMA_BASE_URL is http://localhost:11434, which resolves to the
+      # container itself. Point it at the host instead.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-host.docker.internal:11434}
+      # Leave empty (or set an Atlas URI in .env) to run without MongoDB.
+      MONGODB_URI: ${MONGODB_URI:-}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-eeeztrip}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Keep the Wikimedia image cache across rebuilds.
+      - image-cache:/app/data
+    restart: unless-stopped
+
+  # Opt-in local MongoDB. Start it with:
+  #   docker compose --profile with-mongo up
+  # and set MONGODB_URI=mongodb://mongo:27017 in .env
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    profiles:
+      - with-mongo
+
+volumes:
+  image-cache:
+  mongo-data:

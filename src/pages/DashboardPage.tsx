@@ -14,7 +14,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true;
     const loadTrips = async () => {
-      if (!auth.currentUser) {
+      if (!auth?.currentUser) {
         if (active) setLoading(false);
         return;
       }

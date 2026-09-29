@@ -35,7 +35,7 @@ export default function ChoicePage() {
             position: 'absolute', top: 90, left: 32,
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
-            color: '#5b8bad', fontWeight: 600, fontSize: '0.95rem',
+            color: '#3f7295', fontWeight: 600, fontSize: '0.95rem',
           }}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -55,7 +55,7 @@ export default function ChoicePage() {
           }}>
             How would you like to plan?
           </h1>
-          <p style={{ color: '#5b8bad', fontSize: '1.15rem', marginBottom: 48 }}>
+          <p style={{ color: '#3f7295', fontSize: '1.15rem', marginBottom: 48 }}>
             Choose your preferred way of building the perfect itinerary.
           </p>
 
@@ -106,7 +106,7 @@ export default function ChoicePage() {
               <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.8rem', fontWeight: 800, color: '#0c1b33', margin: 0 }}>
                 Detailed Planning
               </h2>
-              <p style={{ color: '#5b8bad', fontSize: '1.05rem', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ color: '#3f7295', fontSize: '1.05rem', lineHeight: 1.6, margin: 0 }}>
                 You already know where you want to go. Enter your destination and we will craft the perfect itinerary around it.
               </p>
             </button>
@@ -150,7 +150,7 @@ export default function ChoicePage() {
               <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.8rem', fontWeight: 800, color: '#0c1b33', margin: 0 }}>
                 Mood-Based Planning
               </h2>
-              <p style={{ color: '#5b8bad', fontSize: '1.05rem', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ color: '#3f7295', fontSize: '1.05rem', lineHeight: 1.6, margin: 0 }}>
                 Not sure where to go? Tell us how you want to feel, and our AI will pick the perfect destination for you.
               </p>
             </button>

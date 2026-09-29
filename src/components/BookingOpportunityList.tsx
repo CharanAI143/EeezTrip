@@ -61,7 +61,7 @@ export const BookingOpportunityList: React.FC<Props> = ({ destination }) => {
           <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.2rem', color: '#0c1b33', margin: 0 }}>
             Booking Intelligence & Decision Support
           </h3>
-          <span style={{ fontSize: '0.82rem', color: '#5b8bad' }}>
+          <span style={{ fontSize: '0.82rem', color: '#3f7295' }}>
             High-value savings, trade-offs, and hotel/transit opportunities for {destination}
           </span>
         </div>

@@ -5,6 +5,7 @@ import { DestinationReview } from '../types';
 import { Star, MessageCircle, Send, Loader2, MapPin, Search, User as UserIcon, Video, Play, ExternalLink, X, Sparkles, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
+import { toDate } from '../lib/utils';
 
 interface ReviewDestinationsProps {
   user: User | null;
@@ -283,9 +284,9 @@ export function ReviewDestinations({ user, onLogin }: ReviewDestinationsProps) {
                     )}
                     <div>
                       <p className="font-bold text-brand-navy leading-none mb-1.5">{review.userName}</p>
-                      {review.createdAt && (
+                      {review.createdAt && toDate(review.createdAt) && (
                         <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-black">
-                          {format(review.createdAt.toDate ? review.createdAt.toDate() : new Date(review.createdAt), 'MMM d, yyyy')}
+                          {format(toDate(review.createdAt) as Date, 'MMM d, yyyy')}
                         </p>
                       )}
                     </div>

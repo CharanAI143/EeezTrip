@@ -513,6 +513,8 @@ export const ChatBot: React.FC = () => {
         whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={isOpen ? 'Close trip assistant' : 'Open trip assistant'}
+        aria-expanded={isOpen}
         className="group w-16 h-16 bg-gradient-to-r from-sky-600 to-pink-500 rounded-[1.5rem] shadow-2xl flex items-center justify-center text-white border-2 border-white/40 hover:brightness-105 transition-all relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />

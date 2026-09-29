@@ -16,7 +16,7 @@ class BookingAggregator:
         cache: Optional[LiveDataCache] = None,
         providers: Optional[List[BaseBookingProvider]] = None,
     ):
-        self.cache = cache or LiveDataCache(ttls={"booking": 3600})
+        self.cache = cache or LiveDataCache(ttls={"booking": 1800})
         self.providers = providers or [
             HotelProvider(),
             FlightProvider(),
@@ -27,9 +27,11 @@ class BookingAggregator:
     def aggregate_offers(self, destination: str) -> List[BookingOffer]:
         """Aggregate and normalize offers across all registered providers."""
         dest = destination.strip() or "Goa"
-        cache_key = f"booking:{dest.lower()}"
+        # Use the 'booking' category (not 'places') so the booking TTL applies and
+        # offers are not served from the destination-image cache namespace.
+        cache_key = dest.lower()
 
-        cached = self.cache.get("places", cache_key)
+        cached = self.cache.get("booking", cache_key)
         if cached:
             return [BookingOffer(**item) for item in cached]
 
@@ -44,5 +46,5 @@ class BookingAggregator:
                 print(f"[BookingAggregator] Provider '{provider.category}' error: {exc}")
 
         # Save normalized offers to cache
-        self.cache.set("places", cache_key, [o.model_dump() for o in all_normalized])
+        self.cache.set("booking", cache_key, [o.model_dump() for o in all_normalized])
         return all_normalized

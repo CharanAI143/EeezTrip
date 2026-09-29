@@ -109,7 +109,7 @@ export default function BookingPage() {
           
           <button 
             className="btn" 
-            style={{ marginBottom: 40, padding: '8px 16px', background: 'rgba(255,255,255,0.7)', color: '#5b8bad', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+            style={{ marginBottom: 40, padding: '8px 16px', background: 'rgba(255,255,255,0.7)', color: '#3f7295', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
             onClick={() => navigate('results')}
           >
             {Icons.back} Back to Itinerary
@@ -138,7 +138,7 @@ export default function BookingPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, flexWrap: 'wrap'
             }}>
               <div style={{ flex: 1, minWidth: 150, textAlign: 'right' }}>
-                <div style={{ color: '#5b8bad', fontSize: '0.85rem', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>Origin</div>
+                <div style={{ color: '#3f7295', fontSize: '0.85rem', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>Origin</div>
                 <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.6rem', color: '#0c1b33' }}>
                   {origin}
                 </div>
@@ -147,7 +147,7 @@ export default function BookingPage() {
                 {Icons.arrowRight}
               </div>
               <div style={{ flex: 1, minWidth: 150, textAlign: 'left' }}>
-                <div style={{ color: '#5b8bad', fontSize: '0.85rem', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>Destination</div>
+                <div style={{ color: '#3f7295', fontSize: '0.85rem', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>Destination</div>
                 <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.6rem', color: '#ec4899' }}>
                   {destination}
                 </div>
@@ -193,7 +193,7 @@ export default function BookingPage() {
             <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.5rem', color: '#0c1b33', marginBottom: 10 }}>
               Compare Transport Modes
             </h2>
-            <p style={{ color: '#5b8bad', marginBottom: 20 }}>
+            <p style={{ color: '#3f7295', marginBottom: 20 }}>
               Live web-scraped fare snippets for {origin} to {destination}.
             </p>
 
@@ -253,7 +253,7 @@ export default function BookingPage() {
             <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.5rem', color: '#0c1b33', marginBottom: 10 }}>
               Compare Hotel Prices
             </h2>
-            <p style={{ color: '#5b8bad', marginBottom: 20 }}>
+            <p style={{ color: '#3f7295', marginBottom: 20 }}>
               Live web-scraped hotel price snippets for {destination}.
             </p>
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db, collection, addDoc, serverTimestamp, auth } from '../lib/firebase';
+import { db, collection, addDoc, serverTimestamp } from '../lib/firebase';
 import { Recommendation, TripPreferences } from '../types';
 import { useTripStore } from '../state/tripStore';
 
@@ -184,6 +184,7 @@ export function ShareExport({ rec, preferences }: Props) {
   const handleGenerateLink = async () => {
     setGeneratingLink(true);
     try {
+      if (!db) throw new Error('Firebase is not configured.');
       const docRef = await addDoc(collection(db, 'shared_trips'), {
         rec,
         preferences,
@@ -208,6 +209,7 @@ export function ShareExport({ rec, preferences }: Props) {
     }
     setSaving(true);
     try {
+      if (!db) throw new Error('Firebase is not configured.');
       await addDoc(collection(db, 'saved_trips'), {
         userId: state.user.uid,
         rec,

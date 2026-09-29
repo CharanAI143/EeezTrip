@@ -30,7 +30,10 @@
   --deep:     #0c1b33;
   --deep-2:   #1a2f4e;
   --mid:      #2d5474;
-  --muted:    #5b8bad;
+  /* Was #3f7295 — 3.43:1 on --page and 3.66:1 on the glass surface, so it
+     failed WCAG AA (4.5:1) for body text everywhere it was used.
+     #3f7295 measures 4.86 / 5.18 / 4.52 on page, glass and the CTA tint. */
+  --muted:    #3f7295;
   --light:    #a8d4ed;
 
   /* Semantic */
@@ -115,6 +118,22 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
 }
 
+/* ── Feature cards ──
+   The lift uses the `translate` property, not `transform`. These cards also
+   carry .anim-fade-up, whose filled fadeUp animation holds `transform` at its
+   final keyframe; animation declarations outrank normal author rules in the
+   cascade, so a `:hover { transform }` is silently discarded. Using `translate`
+   keeps the two independent, and means a media query can actually switch the
+   lift off under prefers-reduced-motion. */
+.feature-card {
+  transition: translate 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+}
+.feature-card:hover,
+.feature-card:focus-within {
+  translate: 0 -6px;
+  box-shadow: 0 18px 36px rgba(12, 27, 51, 0.12);
+}
+
 /* ── Buttons ── */
 .btn {
   display: inline-flex;
@@ -185,7 +204,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-lg { padding: 18px 40px; font-size: 1.1rem; }
-.btn-sm { padding: 8px 18px; font-size: 0.875rem; }
+/* min-height keeps small buttons at the 44px touch-target minimum; the
+   padding alone rendered them at ~36px. */
+.btn-sm { padding: 8px 18px; font-size: 0.875rem; min-height: 44px; }
 
 /* ── Badge / Chip ── */
 .badge {
@@ -315,6 +336,94 @@ h1, h2, h3, h4, h5, h6 {
 .delay-600 { animation-delay: 0.6s; }
 .delay-700 { animation-delay: 0.7s; }
 
+/* ── Accessibility ────────────────────────────────────────────────────── */
+
+/* Keyboard focus was previously invisible — no focus styling existed anywhere. */
+:focus-visible {
+  outline: 3px solid var(--ice-500);
+  outline-offset: 2px;
+}
+
+/* .btn already carries a glow shadow, so reinforce the ring rather than swap it. */
+.btn:focus-visible {
+  outline: 3px solid var(--ice-600);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.25);
+}
+
+.btn-pink:focus-visible,
+.btn-ghost:focus-visible {
+  outline-color: var(--pink-500);
+  box-shadow: 0 0 0 6px rgba(236, 72, 153, 0.25);
+}
+
+/* .img-card is a <button>; pair the ring with a lift so it reads as interactive. */
+.img-card:focus-visible {
+  outline: 3px solid var(--ice-500);
+  outline-offset: 4px;
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(12, 27, 51, 0.15);
+}
+
+.btn:focus:not(:focus-visible),
+.img-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * Reduced motion: collapse durations rather than setting opacity, so elements
+ * animated with `fill-mode: both` still land on their final visible state.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .glass,
+  .glass-pink,
+  .glass-dark {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .img-card:hover,
+  .img-card:focus-visible,
+  .feature-card,
+  .feature-card:hover,
+  .feature-card:focus-within,
+  .btn:hover:not(:disabled) {
+    transform: none;
+    translate: none;
+  }
+
+  /* A 3D flip is exactly the kind of motion this setting is meant to
+     suppress, so swap it for a plain cross-fade and let the faces stack. */
+  .img-card-inner {
+    transform: none !important;
+  }
+  .img-card-face {
+    transition: opacity 0.2s linear;
+  }
+  .img-card-back {
+    transform: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .img-card[data-flipped='true'] .img-card-front {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .img-card[data-flipped='true'] .img-card-back {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 /* ── Skeleton Loader ── */
 .skeleton {
   background: linear-gradient(90deg, #e0f2fe 25%, #f0f9ff 50%, #e0f2fe 75%);
@@ -399,6 +508,211 @@ h1, h2, h3, h4, h5, h6 {
   padding: 24px;
   color: #fff;
   z-index: 2;
+}
+
+/* ── Flip cards ──────────────────────────────────────────────────────── */
+/* The card is a container; .img-card-inner does the 3D rotation so the lift
+   hover effect and the flip never fight over the same transform property. */
+/* Perspective must sit on the parent of the rotating element, otherwise the
+   Y-rotation projects orthographically and the card mirrors flat instead of
+   turning in depth. */
+.img-card[data-flipped] {
+  perspective: 1200px;
+}
+.img-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.img-card[data-flipped='true'] .img-card-inner {
+  transform: rotateY(180deg);
+}
+
+.img-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.img-card-back {
+  transform: rotateY(180deg);
+  background: linear-gradient(160deg, #0c1b33 0%, #143a63 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  /* The back face now carries a region line and a labelled list on top of the
+     tag, title, blurb and actions, so allow it to scroll rather than clip if a
+     longer destination overflows the 340px card. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Tap/click target covering the whole front face. Kept transparent so the
+   card name and image stay visible underneath. */
+.img-card-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+}
+
+/*
+ * Once flipped, the front face is turned away but this full-card overlay would
+ * still win hit-testing and swallow clicks aimed at the back face's buttons.
+ * Retiring it hands interaction to the back face.
+ */
+.img-card[data-flipped='true'] .img-card-front,
+.img-card[data-flipped='true'] .img-card-hit,
+.img-card[data-flipped='true'] .img-card-content,
+.img-card[data-flipped='true'] .img-card-hint {
+  pointer-events: none;
+}
+.img-card-hit:focus-visible {
+  outline: 3px solid var(--ice-500);
+  outline-offset: 4px;
+}
+
+.img-card-hint {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 4;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(12, 27, 51, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.img-card[data-flipped='false']:hover .img-card-hint,
+.img-card-hit:focus-visible ~ .img-card-hint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.img-card-back-title {
+  font-family: 'Outfit, sans-serif';
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0 0 2px;
+}
+.img-card-back-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  margin-bottom: 8px;
+}
+/* Where the place is — sits under the name, before the descriptive blurb. */
+.img-card-back-region {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #9dc6e4;
+  margin: 0 0 8px;
+}
+/* Accessible name for the list of things a destination is known for. */
+.img-card-back-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  margin: 0 0 5px;
+}
+.img-card-back-body {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #c7dcee;
+  margin: 0 0 12px;
+}
+.img-card-highlights {
+  list-style: none;
+  margin: 0 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.img-card-highlights li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: #e2f1fb;
+  line-height: 1.45;
+}
+.img-card-highlights li::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ice-400), var(--pink-400));
+}
+.img-card-back-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.img-card-back-actions .btn {
+  /* 44px minimum: at 10px vertical padding these measured 42px tall, which
+     clears WCAG AA (24px) but misses the 44px touch-target guideline. */
+  padding: 12px 20px;
+  min-height: 44px;
+  font-size: 0.9rem;
+}
+.img-card-flip-back {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #bae6fd;
+  padding: 12px 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+.img-card-flip-back:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.img-card-flip-back:focus-visible {
+  outline: 3px solid var(--ice-400);
+  outline-offset: 2px;
+}
+
+/* Only apply the lift when the card is not mid-flip, so the two transforms
+   never compete for the same element. */
+.img-card[data-flipped='false']:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(12, 27, 51, 0.15);
+}
+.img-card[data-flipped='true'] {
+  box-shadow: 0 20px 45px rgba(12, 27, 51, 0.28);
 }
 
 /* ── Premium Icons ── */

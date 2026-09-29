@@ -7,6 +7,7 @@ from backend.app.api.v1.concierge import router as concierge_router
 from backend.app.api.v1.daily_brief import router as daily_brief_router
 from backend.app.api.v1.booking import router as booking_router
 from backend.app.api.v1.personalization import router as personalization_router
+from backend.app.api.v1.voice import router as voice_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(recommendation_router)
@@ -17,3 +18,4 @@ api_v1_router.include_router(concierge_router)
 api_v1_router.include_router(daily_brief_router)
 api_v1_router.include_router(booking_router)
 api_v1_router.include_router(personalization_router)
+api_v1_router.include_router(voice_router)

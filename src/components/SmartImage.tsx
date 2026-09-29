@@ -31,7 +31,7 @@ export function SmartImage({ place, state = '', type = 'travel', className, fall
             setError(true);
           }
         }
-      } catch (err) {
+      } catch {
         if (mounted) setError(true);
       } finally {
         if (mounted) setLoading(false);

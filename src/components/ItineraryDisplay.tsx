@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Download, Check, Sparkles, MapPin, ExternalLink, Share2, Bookmark, Loader2, Camera, Navigation, Map as MapIcon } from 'lucide-react';
+import { Copy, Download, Check, Sparkles, MapPin, ExternalLink, Share2, Bookmark, Loader2, Camera } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MapMarker } from '../types';
 import { User } from 'firebase/auth';
@@ -20,7 +20,6 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set());
   const [highlightedMarkerId, setHighlightedMarkerId] = useState<string | null>(null);
   const mapRef = React.useRef<HTMLDivElement>(null);
 
@@ -29,7 +28,7 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
     const markerTagRegex = /<map_markers_json>([\s\S]*?)<\/map_markers_json>/i;
     const internalBlockRegex = /#+ \[?INTERNAL_DATA\]?[\s\S]*?\[?END_INTERNAL_DATA\]?/gi;
     
-    let match = content.match(markerTagRegex);
+    const match = content.match(markerTagRegex);
     let parsedMarkers: MapMarker[] = [];
     
     if (match) {
@@ -52,7 +51,7 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
     const heroUrl = heroImageMatch ? heroImageMatch[1] : `https://source.unsplash.com/featured/1200x600/?${extractedDestination.replace(/\s+/g, '')},travel`;
 
     // Strictly strip the internal data block and any manual image syntax from the visual content
-    let cleanContent = content
+    const cleanContent = content
       .replace(internalBlockRegex, '')
       .replace(/<map_markers_json>([\s\S]*?)<\/map_markers_json>/i, '')
       .replace(/#+ Markers[\s\S]*?(?=($|#))/gi, '')
@@ -60,7 +59,7 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
       .trim();
 
     // Extract summary (first paragraph that isn't a heading or list)
-    const summaryMatch = cleanContent.match(/^(?![#\*-])(.*)/m);
+    const summaryMatch = cleanContent.match(/^(?![#*-])(.*)/m);
     const summary = summaryMatch ? summaryMatch[1] : '';
 
     return { 
@@ -76,15 +75,6 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
   const handleFocusMarker = (marker: MapMarker) => {
     setHighlightedMarkerId(marker.id);
     mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const toggleVisited = (id: string) => {
-    setVisitedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   };
 
   const handleCopy = () => {
@@ -307,7 +297,7 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
                 </h2>
               ),
               img: () => null, // Hidden as per request
-              a: ({ children, href, title, ...props }) => {
+              a: ({ children, href, title }) => {
                 const isGoogleMaps = href?.startsWith('https://www.google.com/maps/search/');
                 
                 if (isGoogleMaps) {
@@ -349,11 +339,9 @@ export function ItineraryDisplay({ content, isComplete, user, onSave, onLogin }:
                     <button
                       onClick={() => handleFocusMarker(marker)}
                       className={`inline-flex items-center gap-1 font-bold transition-colors ${
-                        visitedIds.has(marker.id)
-                          ? 'text-green-600 line-through opacity-50'
-                          : highlightedMarkerId === marker.id 
-                            ? 'text-brand-amber underline decoration-brand-amber underline-offset-4' 
-                            : 'text-brand-coral hover:underline decoration-brand-coral/30 underline-offset-4'
+                        highlightedMarkerId === marker.id 
+                          ? 'text-brand-amber underline decoration-brand-amber underline-offset-4' 
+                          : 'text-brand-coral hover:underline decoration-brand-coral/30 underline-offset-4'
                       }`}
                     >
                       <MapPin className="w-3 h-3" />

@@ -1,10 +1,18 @@
-from typing import Dict, Any, Optional
+import asyncio
+from typing import Any, Dict, Optional
+
+from backend.app.providers.ai.factory import AIProviderFactory, BaseLLMProvider
 from backend.app.schemas.concierge import ConciergeRequest, ConciergeResponse, IntentType
 from backend.app.services.intent_classifier import IntentClassifier
 from backend.app.services.concierge_response_builder import ConciergeResponseBuilder
 from backend.app.services.travel_intelligence_service import TravelIntelligenceService
 from backend.app.services.trip_session_service import TripSessionService
-from backend.app.providers.ai.factory import AIProviderFactory
+
+_SYSTEM_INSTRUCTION = (
+    "You are EeezTrip's AI travel concierge. Answer concisely, practically and warmly. "
+    "Ground answers in the trip context provided."
+)
+
 
 class IntentEngine:
     """Intelligent Routing Engine directing concierge queries to domain services or LLM reasoning."""
@@ -18,6 +26,7 @@ class IntentEngine:
         self.classifier = classifier or IntentClassifier()
         self.intelligence_service = intelligence_service or TravelIntelligenceService()
         self.session_service = session_service or TripSessionService()
+        self.provider_names = AIProviderFactory.provider_chain()
 
     async def process_query(
         self,
@@ -29,8 +38,8 @@ class IntentEngine:
         mood = "Relaxed"
 
         if session_data:
-            pref = session_data.get("preferences", {})
-            curr = session_data.get("current_itinerary", {})
+            pref = session_data.get("preferences", {}) or {}
+            curr = session_data.get("current_itinerary", {}) or {}
             dest = pref.get("destination") or curr.get("destination") or dest
             mood = pref.get("mood") or mood
 
@@ -46,20 +55,20 @@ class IntentEngine:
 
         # Routing based on Intent Type
         if intent == IntentType.WEATHER_QUESTION:
-            intel = self.intelligence_service.get_intelligence(dest)
+            intel = await asyncio.to_thread(self.intelligence_service.get_intelligence, dest)
             return ConciergeResponseBuilder.build_weather_response(req.query, dest, intel.weather_summary)
 
-        elif intent == IntentType.PACKING_ADVICE:
-            intel = self.intelligence_service.get_intelligence(dest)
+        if intent == IntentType.PACKING_ADVICE:
+            intel = await asyncio.to_thread(self.intelligence_service.get_intelligence, dest)
             return ConciergeResponseBuilder.build_packing_response(req.query, dest, intel.weather_summary, mood)
 
-        elif intent == IntentType.TRIP_QUESTION and session_data:
+        if intent == IntentType.TRIP_QUESTION and session_data:
             return ConciergeResponseBuilder.build_trip_question_response(req.query, session_data)
 
         # Fallback to LLM reasoning with full Trip Session context for open-ended queries
-        return self._llm_reasoning_response(req.query, dest, intent, confidence, session_data)
+        return await self._llm_reasoning_response(req.query, dest, intent, confidence, session_data)
 
-    def _llm_reasoning_response(
+    async def _llm_reasoning_response(
         self,
         query: str,
         destination: str,
@@ -67,29 +76,45 @@ class IntentEngine:
         confidence: float,
         session_data: Optional[Dict[str, Any]] = None
     ) -> ConciergeResponse:
-        try:
-            provider = AIProviderFactory.get_provider("gemini")
-            prompt = f"Travel Concierge query for {destination}: '{query}'"
-            if session_data:
-                context_str = self.session_service.get_context(session_data)
-                prompt = f"{context_str}\n\nTraveler Question: '{query}'\nConcierge Response:"
+        if session_data:
+            context_str = await asyncio.to_thread(self.session_service.get_context, session_data)
+            prompt = (
+                f"{context_str}\n\n"
+                f"Traveler Question: '{query}'\n"
+                f"Answer as a concise, practical travel concierge. Destination: {destination}.\n"
+                f"Concierge Response:"
+            )
+        else:
+            prompt = (
+                f"You are a travel concierge. Answer this question concisely and practically. "
+                f"Destination: {destination}.\n"
+                f"Traveler Question: '{query}'\n"
+                f"Concierge Response:"
+            )
 
-            if provider.is_available():
-                reply = provider.generate_text(prompt)
-                if reply:
+        for provider_name in self.provider_names:
+            try:
+                provider = AIProviderFactory.get_provider(provider_name)
+                if not provider.is_available():
+                    continue
+                # Provider calls are blocking HTTP, so keep them off the event loop.
+                reply = await asyncio.to_thread(provider.generate_text, prompt, _SYSTEM_INSTRUCTION)
+                if reply and reply.strip():
                     return ConciergeResponse(
-                        reply=reply,
+                        reply=reply.strip(),
                         detected_intent=intent,
                         confidence=confidence,
                         action_taken="LLM Contextual Reasoning",
-                        metadata={"destination": destination}
+                        metadata={"destination": destination, "provider": provider_name}
                     )
-        except Exception as exc:
-            print(f"[IntentEngine] LLM reasoning fallback note: {exc}")
+            except Exception as exc:
+                print(f"[IntentEngine] Provider '{provider_name}' reasoning failed: {exc}")
 
-        # Deterministic fallback response
         return ConciergeResponse(
-            reply=f"For your journey in {destination}, here is a helpful tip: {query.strip().capitalize()}. Enjoy your travel experience!",
+            reply=(
+                f"I couldn't reach my AI assistant just now, so here's a quick pointer for "
+                f"{destination}: {query.strip().capitalize()}. Try again in a moment for a fuller answer."
+            ),
             detected_intent=intent,
             confidence=confidence,
             action_taken="Deterministic Travel Assistant Response",
