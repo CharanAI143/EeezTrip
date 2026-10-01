@@ -492,7 +492,7 @@ h1, h2, h3, h4, h5, h6 {
   --lp-ground: #070d1c;
   --lp-ink: #e6edf7;
   --lp-ink-soft: #a8bad4;
-  --lp-panel: rgba(15, 27, 51, 0.78);
+  --lp-panel: rgba(13, 24, 45, 0.92);
   --lp-panel-border: rgba(148, 178, 226, 0.22);
   --lp-alt-band: rgba(12, 24, 46, 0.5);
   color: var(--lp-ink);
@@ -510,10 +510,16 @@ h1, h2, h3, h4, h5, h6 {
   background: linear-gradient(180deg, transparent, var(--lp-alt-band), transparent);
 }
 
+/* The weather veil is painted at z-90, over the panels, so a panel can only
+   stay clean by being opaque enough to stop the tint coming through the glass.
+   That is what the 0.86 above is for. The shadow also has to be swapped: the
+   day token is a pale blue glow, which over a dark ground reads as a halo
+   around the panel rather than as depth. */
 .lp-page[data-tod='night'] .glass,
 .lp-page[data-tod='night'] .glass-card {
   background: var(--lp-panel);
   border-color: var(--lp-panel-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 /* ── Day / night toggle ──
@@ -771,7 +777,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .weather-layer[data-tod='night'] .weather-veil--wind {
   background:
-    radial-gradient(100% 60% at 20% 10%, rgba(148, 163, 184, 0.30) 0%, transparent 60%),
+    radial-gradient(100% 60% at 20% 10%, rgba(150, 132, 106, 0.20) 0%, transparent 60%),
     linear-gradient(180deg, rgba(18, 28, 46, 0.5) 0%, rgba(8, 14, 28, 0.68) 100%);
 }
 
@@ -784,19 +790,22 @@ h1, h2, h3, h4, h5, h6 {
 /* Night particles are lit rather than emissive. Flakes and motes are backed by
    a glow that disappears on a dark ground, so they are given a solid core
    instead; the streaks keep their gradient but cool toward the moonlit tone. */
+/* Night keeps the same dust hue rather than switching to moonlight blue. A warm
+   mid-tone on the deep blue ground has more contrast than a cool tint would, so
+   recolouring it for night was making the streaks harder to see, not easier. */
 .weather-layer[data-tod='night'] .weather-wind-streak {
   background: linear-gradient(
     90deg,
-    rgba(148, 178, 226, 0) 0%,
-    rgba(148, 178, 226, 0.3) 20%,
-    rgba(178, 200, 235, 0.52) 50%,
-    rgba(148, 178, 226, 0.3) 80%,
-    rgba(148, 178, 226, 0) 100%
+    rgba(201, 168, 126, 0) 0%,
+    rgba(201, 168, 126, 0.42) 20%,
+    rgba(226, 198, 158, 0.78) 50%,
+    rgba(201, 168, 126, 0.42) 80%,
+    rgba(201, 168, 126, 0) 100%
   );
 }
 
 .weather-layer[data-tod='night'] .weather-wind-dust {
-  background: rgba(178, 197, 226, 0.85);
+  background: rgba(184, 152, 112, 0.9);
 }
 
 .weather-layer[data-tod='night'] .weather-drop {
@@ -825,20 +834,30 @@ h1, h2, h3, h4, h5, h6 {
     linear-gradient(180deg, rgba(12, 44, 74, 0.46) 0%, rgba(8, 32, 58, 0.60) 100%);
 }
 
+/* Deliberately desaturated. This is the only effect with no particles carrying
+   it, so the veil is the whole season signal — and a saturated yellow at high
+   alpha turns the entire viewport amber, which tints the glass panels sitting
+   on top of it and reads as a nightlight filter rather than as sunlight. The
+   motes do the visibility work; the veil only needs to warm the ground. */
 .weather-veil--sun {
   background:
-    radial-gradient(90% 70% at 78% 8%, rgba(253, 224, 71, 0.44) 0%, rgba(251, 191, 36, 0.20) 42%, transparent 70%),
-    linear-gradient(180deg, rgba(255, 214, 140, 0.32) 0%, rgba(255, 244, 214, 0.16) 100%);
+    radial-gradient(90% 70% at 78% 8%, rgba(254, 240, 199, 0.34) 0%, rgba(252, 228, 178, 0.14) 42%, transparent 70%),
+    linear-gradient(180deg, rgba(255, 238, 208, 0.20) 0%, rgba(255, 250, 240, 0.10) 100%);
 }
 
 /* Carried a little heavier than the other veils. The wind streaks are the
    lowest-contrast effect in the layer, so the haze behind them is what makes
    the season legible at a glance rather than leaving the field nearly
    invisible against the hero. */
+/* Kept light and only faintly warm, and that is a structural constraint rather
+   than a taste one: this veil is painted over the whole viewport at z-90, so
+   anything heavy here washes straight through the white glass panels and tints
+   them. The dust signal belongs to the streaks, which are the part of the
+   effect that moves; the veil only has to suggest haze behind them. */
 .weather-veil--wind {
   background:
-    radial-gradient(100% 60% at 20% 10%, rgba(214, 211, 209, 0.44) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(180, 175, 170, 0.40) 0%, rgba(120, 113, 108, 0.50) 100%);
+    radial-gradient(100% 60% at 20% 10%, rgba(214, 196, 170, 0.18) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(200, 186, 166, 0.12) 0%, rgba(150, 136, 118, 0.18) 100%);
 }
 
 .weather-veil--snow {
@@ -897,6 +916,11 @@ h1, h2, h3, h4, h5, h6 {
    distributed across the frame at first paint instead of all entering together.
    The midpoint keyframe lifts or drops the streak by --wd-bob, which is what
    keeps the paths from being perfectly parallel. */
+/* Dust, not white. Two reasons, and the second is the important one:
+   airborne particulate is what a post-monsoon wind actually carries, and a warm
+   mid-tone holds its contrast against BOTH the pale day hero and the deep
+   night ground. The white these replaced was invisible over the day hero, which
+   is the entire problem the streaks were rebuilt to solve. */
 .weather-wind-streak {
   position: absolute;
   left: -30vw;
@@ -907,11 +931,11 @@ h1, h2, h3, h4, h5, h6 {
      even along its length. */
   background: linear-gradient(
     90deg,
-    rgba(226, 232, 240, 0) 0%,
-    rgba(226, 232, 240, 0.28) 20%,
-    rgba(240, 246, 252, 0.5) 50%,
-    rgba(226, 232, 240, 0.28) 80%,
-    rgba(226, 232, 240, 0) 100%
+    rgba(201, 168, 126, 0) 0%,
+    rgba(201, 168, 126, 0.34) 20%,
+    rgba(219, 189, 148, 0.62) 50%,
+    rgba(201, 168, 126, 0.34) 80%,
+    rgba(201, 168, 126, 0) 100%
   );
   will-change: transform, opacity;
   animation: weather-wind-streak var(--wd-duration) linear var(--wd-delay) infinite;
@@ -927,9 +951,10 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   left: -10vw;
   border-radius: 50%;
-  /* Slightly blue-grey rather than white, so a mote crossing the lighter parts
-     of the hero stays visible instead of disappearing into them. */
-  background: rgba(214, 222, 232, 0.8);
+  /* Darker than the streaks on purpose. The streaks are the haze in motion and
+     the motes are the heavier grit in it, so a mote at the same value as the
+     streak it sits on would flatten into it. */
+  background: rgba(168, 137, 98, 0.85);
   will-change: transform, opacity;
   animation: weather-wind-dust var(--wd-duration) linear var(--wd-delay) infinite;
 }

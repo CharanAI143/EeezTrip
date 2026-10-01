@@ -123,8 +123,8 @@ function moteStyle(m: Mote, still: boolean): CSSProperties {
    procession travelling in a single direction. */
 
 const windRand = makeRandom(0x21d7);
-const STREAK_COUNT = 30;
-const DUST_COUNT = 22;
+const STREAK_COUNT = 46;
+const DUST_COUNT = 34;
 
 type Streak = {
   top: string;
@@ -156,7 +156,11 @@ const STREAKS: Streak[] = Array.from({ length: STREAK_COUNT }, () => {
     // 5-14s across the viewport. The spread is what keeps the strands from
     // marching in lockstep.
     duration: windRand() * 9 + 5,
-    delay: -(windRand() * 14),
+    // Spread wider than the longest duration, not just across it. With 46
+    // strands a 14s window over a 5-14s range leaves clumps at the short
+    // end, where several strands share a similar position and a similar
+    // phase and read as one thick band instead of as moving air.
+    delay: -(windRand() * 19),
   };
 });
 
@@ -197,7 +201,9 @@ const DUST: Dust[] = Array.from({ length: DUST_COUNT }, () => ({
   opacity: windRand() * 0.3 + 0.24,
   bob: windRand() * 40 - 20,
   duration: windRand() * 11 + 8,
-  delay: -(windRand() * 19),
+  // Wider than the streak delay window, so the two layers do not share an
+  // obvious rhythm and the motes stay scattered as they slow down.
+  delay: -(windRand() * 24),
 }));
 
 function dustStyle(d: Dust, still: boolean): CSSProperties {
