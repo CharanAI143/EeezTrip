@@ -20,6 +20,11 @@ class PreferenceHistoryEntry(BaseModel):
 class UserPreferenceProfile(BaseModel):
     user_id: str = "anonymous"
     travel_style: PreferenceItem = Field(default_factory=lambda: PreferenceItem(value="balanced", confidence=0.8, source="EXPLICIT"))
+    # Approximate home region, used to pick the seasonal theme on the landing
+    # page. "auto" means "derive it from the browser timezone at render time",
+    # which is the default so a signed-out reader still gets a sensible season.
+    # One of the region ids in frontend src/components/landing/weather.ts.
+    home_region: PreferenceItem = Field(default_factory=lambda: PreferenceItem(value="auto", confidence=0.5, source="BEHAVIOR"))
     budget_level: PreferenceItem = Field(default_factory=lambda: PreferenceItem(value="moderate", confidence=0.8, source="EXPLICIT"))
     walking_preference: PreferenceItem = Field(default_factory=lambda: PreferenceItem(value="moderate", confidence=0.7, source="BEHAVIOR"))
     preferred_transport: PreferenceItem = Field(default_factory=lambda: PreferenceItem(value="public_transit", confidence=0.75, source="BEHAVIOR"))

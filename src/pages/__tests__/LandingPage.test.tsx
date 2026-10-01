@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const navigate = vi.fn();
 const dispatch = vi.fn();
@@ -8,7 +8,46 @@ vi.mock('../../state/tripStore', () => ({
   useTripStore: () => ({ navigate, dispatch }),
 }));
 
+// The provider reads the signed-in user's home region to theme the weather, so
+// the profile fetch is stubbed per-test rather than hitting the network.
+vi.mock('../../api/client', () => ({
+  fetchUserProfile: vi.fn().mockResolvedValue(null),
+}));
+
 import LandingPage, { FLIP_DELAY_MS, HERO_SWAP_MS } from '../LandingPage';
+import { fetchUserProfile } from '../../api/client';
+import {
+  climateOf,
+  detectRegion,
+  regionFromTimeZone,
+  resolveSeason,
+  resolveWeather,
+  SEASON_WEATHER,
+} from '../../components/landing/weather';
+
+/** Build a date in a given month (0-indexed) so the calendar is explicit. */
+const monthDate = (month: number) => new Date(2026, month, 15);
+
+/** Pin the timezone the provider will read, as the browser would report it. */
+function stubTimeZone(tz: string) {
+  vi.spyOn(Intl, 'DateTimeFormat').mockReturnValue({
+    resolvedOptions: () => ({ timeZone: tz }),
+  } as unknown as Intl.DateTimeFormat);
+}
+
+/**
+ * Render as a reader in India during the monsoon.
+ *
+ * The weather is now a function of region and calendar, so a test that only
+ * renders the page would get whatever season the day it runs happens to be in.
+ * Both halves are pinned here instead, which also keeps the assertion stable
+ * across the year.
+ */
+function renderInMonsoon() {
+  stubTimeZone('Asia/Kolkata');
+  vi.setSystemTime(monthDate(6));
+  render(<LandingPage />);
+}
 
 describe('LandingPage interactions', () => {
   beforeEach(() => {
@@ -313,5 +352,328 @@ describe('LandingPage interactions', () => {
     // <br /> contributes no space to textContent, which used to yield
     // "perfectly plannedin seconds." for copy-paste and text extraction.
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('planned in seconds');
+  });
+});
+
+describe('Seasonal weather layer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The weather follows the real calendar now, so every test that renders the
+    // page has to control the date itself.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(monthDate(6));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('maps each Indian season to its effect', () => {
+    // The mapping is the whole point of the layer: the page used to run a
+    // year-round blizzard regardless of the month.
+    expect(resolveSeason(monthDate(0), 'southAsia')).toBe('winter'); // Jan
+    expect(resolveSeason(monthDate(4), 'southAsia')).toBe('summer'); // May
+    expect(resolveSeason(monthDate(6), 'southAsia')).toBe('monsoon'); // Jul
+    expect(resolveSeason(monthDate(9), 'southAsia')).toBe('postMonsoon'); // Oct
+    expect(resolveSeason(monthDate(11), 'southAsia')).toBe('winter'); // Dec
+
+    expect(SEASON_WEATHER).toEqual({
+      monsoon: 'rain',
+      summer: 'sunny',
+      postMonsoon: 'wind',
+      winter: 'snow',
+    });
+  });
+
+  it('flips the southern hemisphere by six months', () => {
+    // January in Sydney is midsummer, so it maps to the month India is in July.
+    expect(resolveSeason(monthDate(0), 'oceania', 'Australia/Sydney')).toBe('summer');
+    expect(resolveSeason(monthDate(6), 'oceania', 'Australia/Sydney')).toBe('winter');
+    // Same region, opposite hemisphere, opposite season.
+    expect(resolveSeason(monthDate(0), 'oceania', 'Australia/Sydney')).not.toBe(
+      resolveSeason(monthDate(0), 'europe')
+    );
+  });
+
+  it('gives the tropics a wet year-round rather than a monsoon', () => {
+    // Singapore has no dry season, so calling all twelve months "monsoon"
+    // would be the same error the layer existed to fix.
+    for (let m = 0; m < 12; m += 1) {
+      expect(resolveSeason(monthDate(m), 'southeastAsia')).toBe('summer');
+      expect(resolveWeather(monthDate(m), 'southeastAsia')).toBe('sunny');
+    }
+    expect(climateOf('southeastAsia')).toBe('tropical');
+  });
+
+  it('maps a timezone to the region whose calendar applies', () => {
+    expect(regionFromTimeZone('Asia/Kolkata')).toBe('southAsia');
+    expect(regionFromTimeZone('Asia/Kathmandu')).toBe('himalaya');
+    expect(regionFromTimeZone('Europe/Berlin')).toBe('europe');
+    expect(regionFromTimeZone('America/New_York')).toBe('northAmerica');
+    expect(regionFromTimeZone('Australia/Sydney')).toBe('oceania');
+    // An unknown zone is a deliberate null, so the caller can fall back
+    // rather than silently showing the wrong hemisphere.
+    expect(regionFromTimeZone('Mars/Olympus_Mons')).toBeNull();
+    expect(regionFromTimeZone(undefined)).toBeNull();
+  });
+
+  it('themes the page for the region the browser reports', () => {
+    stubTimeZone('Europe/Berlin');
+
+    render(<LandingPage />);
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    // Berlin is temperate, so the season follows the current calendar there
+    // rather than the Indian monsoon the page used to be pinned to.
+    expect(page.dataset.region).toBe('europe');
+    expect(['winter', 'summer', 'postMonsoon']).toContain(page.dataset.season);
+  });
+
+  it('prefers the signed-in user region over the browser timezone', async () => {
+    stubTimeZone('Europe/Berlin');
+    (fetchUserProfile as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      home_region: { value: 'southAsia' },
+    });
+
+    render(<LandingPage />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.region).toBe('southAsia');
+  });
+
+  it('falls back to the timezone when the stored region is not recognised', async () => {
+    stubTimeZone('Europe/Berlin');
+    (fetchUserProfile as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      home_region: { value: 'atlantis' },
+    });
+
+    render(<LandingPage />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.region).toBe('europe');
+  });
+
+  it('keeps rendering when the profile request fails', async () => {
+    stubTimeZone('Asia/Kolkata');
+    (fetchUserProfile as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('offline')
+    );
+
+    render(<LandingPage />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.region).toBe('southAsia');
+    expect(page.dataset.weather).toBe('rain');
+  });
+
+  it('falls back to the product default when no timezone is available', () => {
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => {
+      throw new Error('Intl unavailable');
+    });
+
+    render(<LandingPage />);
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.region).toBe('southAsia');
+  });
+
+  it('detects the region from the current environment', () => {
+    stubTimeZone('Asia/Kolkata');
+    expect(detectRegion()).toBe('southAsia');
+  });
+
+  it('renders rain for an Indian reader in the monsoon', () => {
+    renderInMonsoon();
+
+    const layer = document.querySelector('.weather-layer') as HTMLElement;
+    expect(layer.dataset.kind).toBe('rain');
+    expect(layer.dataset.still).toBe('false');
+    expect(document.querySelector('.weather-drop')).not.toBeNull();
+    // No other effect should be in the tree at the same time.
+    expect(document.querySelector('.weather-flake')).toBeNull();
+    expect(document.querySelector('.weather-wind-streak')).toBeNull();
+    expect(document.querySelector('.weather-mote')).toBeNull();
+  });
+
+  it('exposes the region, season and derived effect on the page root', () => {
+    renderInMonsoon();
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.region).toBe('southAsia');
+    expect(page.dataset.season).toBe('monsoon');
+    expect(page.dataset.weather).toBe('rain');
+  });
+
+  it('shows a different effect to a reader outside the monsoon', () => {
+    // October in India: the monsoon has withdrawn, so the page must not still
+    // be selling the rainy hero to a reader standing in a dry week.
+    stubTimeZone('Asia/Kolkata');
+    vi.setSystemTime(monthDate(9));
+
+    render(<LandingPage />);
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.season).toBe('postMonsoon');
+    expect(page.dataset.weather).toBe('wind');
+    expect(document.querySelector('.weather-wind-streak')).not.toBeNull();
+    expect(document.querySelector('.weather-drop')).toBeNull();
+  });
+
+  it('renders wind as streaks and dust rather than solid shapes', () => {
+    // The first wind build used 14 hard-edged glowing rings, each translated
+    // rightward and looping back to its origin, which read on screen as a row
+    // of orbs marching in one direction. The field has to be edge-faded strands
+    // plus slower dust instead.
+    stubTimeZone('Asia/Kolkata');
+    vi.setSystemTime(monthDate(9));
+
+    const { container } = render(<LandingPage />);
+
+    const streaks = container.querySelectorAll('.weather-wind-streak');
+    const dust = container.querySelectorAll('.weather-wind-dust');
+    // Enough strands in frame that the field reads as air, not a procession.
+    expect(streaks.length).toBeGreaterThan(10);
+    // A second, slower component; without it every element moves at one speed.
+    expect(dust.length).toBeGreaterThan(0);
+
+    // No circular, bordered element remains: nothing to read as an orb.
+    expect(container.querySelectorAll('.weather-wind-dust')[0].className).not.toMatch(/swirl/);
+    for (const streak of streaks) {
+      const el = streak as HTMLElement;
+      // Streaks are wide and flat, which is what makes them read as travel.
+      expect(el.style.width).not.toBe('');
+      expect(parseFloat(el.style.height)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('makes the wind field clearly visible without a hard or aliased edge', () => {
+    stubTimeZone('Asia/Kolkata');
+    vi.setSystemTime(monthDate(9));
+
+    const { container } = render(<LandingPage />);
+
+    // Visible: every strand and mote sits well above the near-invisible range
+    // the first build used, and the field is dense enough to read at a glance.
+    for (const el of container.querySelectorAll<HTMLElement>('.weather-wind-streak')) {
+      expect(parseFloat(el.style.opacity)).toBeGreaterThanOrEqual(0.3);
+      // Softened: a 1-2px line at this opacity aliases into a hard jagged mark
+      // without a sub-pixel blur, which is the strain the reader would feel.
+      expect(el.style.filter).toContain('blur');
+    }
+    for (const el of container.querySelectorAll<HTMLElement>('.weather-wind-dust')) {
+      expect(parseFloat(el.style.opacity)).toBeGreaterThanOrEqual(0.24);
+      expect(el.style.filter).toContain('blur');
+    }
+  });
+
+  it('stills every particle when reduced motion is requested', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+    try {
+      renderInMonsoon();
+
+      const layer = document.querySelector('.weather-layer') as HTMLElement;
+      expect(layer.dataset.still).toBe('true');
+      // The veil remains, so the season still reads as a colour cast.
+      expect(document.querySelector('.weather-veil--rain')).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('resolves every month of every region to one of the four effects', () => {
+    for (const region of ['southAsia', 'himalaya', 'southeastAsia', 'europe', 'oceania'] as const) {
+      for (let m = 0; m < 12; m += 1) {
+        const kind = resolveWeather(monthDate(m), region);
+        expect(['rain', 'sunny', 'wind', 'snow']).toContain(kind);
+      }
+    }
+  });
+});
+
+describe('Day and night themes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    stubTimeZone('Asia/Kolkata');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('shows the day theme during daylight hours', () => {
+    // 14:00 local.
+    vi.setSystemTime(new Date(2026, 6, 15, 14, 0, 0));
+
+    render(<LandingPage />);
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.tod).toBe('day');
+    expect(document.querySelector('.weather-layer')!.getAttribute('data-tod')).toBe('day');
+  });
+
+  it('shows the night theme after dark', () => {
+    vi.setSystemTime(new Date(2026, 6, 15, 23, 0, 0));
+
+    render(<LandingPage />);
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.tod).toBe('night');
+  });
+
+  it('keeps the season effect when only the time of day changes', () => {
+    // Day/night is a colour axis, not an effect axis: the monsoon must stay the
+    // monsoon at 2am, otherwise the toggle would be picking a season too.
+    vi.setSystemTime(new Date(2026, 6, 15, 23, 0, 0));
+
+    render(<LandingPage />);
+
+    const layer = document.querySelector('.weather-layer') as HTMLElement;
+    expect(layer.dataset.kind).toBe('rain');
+    expect(layer.dataset.tod).toBe('night');
+  });
+
+  it('switches theme from the control and does not let the clock undo it', () => {
+    vi.setSystemTime(new Date(2026, 6, 15, 14, 0, 0));
+
+    render(<LandingPage />);
+
+    const night = screen.getByRole('button', { name: /night/i });
+    expect(night.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(night);
+
+    const page = document.querySelector('.lp-page') as HTMLElement;
+    expect(page.dataset.tod).toBe('night');
+    expect(night.getAttribute('aria-pressed')).toBe('true');
+
+    // Advance past the minute tick; the pinned choice must survive it.
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(document.querySelector('.lp-page')!.getAttribute('data-tod')).toBe('night');
+  });
+
+  it('offers a way back to the clock once pinned', () => {
+    vi.setSystemTime(new Date(2026, 6, 15, 14, 0, 0));
+
+    render(<LandingPage />);
+    fireEvent.click(screen.getByRole('button', { name: /night/i }));
+
+    // "Auto" only appears once the reader has overridden the clock, so an
+    // un-overridden page has no dead control on it.
+    fireEvent.click(screen.getByRole('button', { name: /auto/i }));
+
+    expect(document.querySelector('.lp-page')!.getAttribute('data-tod')).toBe('day');
   });
 });

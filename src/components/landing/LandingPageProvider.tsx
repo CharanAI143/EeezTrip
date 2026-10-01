@@ -6,6 +6,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
 import {
@@ -15,6 +16,20 @@ import {
   SECTION_IDS,
   type SectionId,
 } from './landingContent';
+import {
+  DEFAULT_REGION,
+  DEFAULT_SEASON,
+  detectRegion,
+  REGION_OPTIONS,
+  resolveSeason,
+  resolveTimeOfDay,
+  SEASON_WEATHER,
+  type Region,
+  type Season,
+  type TimeOfDay,
+  type WeatherKind,
+} from './weather';
+import { fetchUserProfile } from '../../api/client';
 
 /**
  * Page-level state for the landing page.
@@ -55,7 +70,71 @@ export type LandingState = {
   scrollProgress: number;
   /** Set when the reader has asked for less motion than the page animates. */
   reducedMotion: boolean;
+  /**
+   * Which region the page weather is being themed for. Detected from the
+   * browser timezone, and overridden by the signed-in user's stored home region
+   * once the profile loads, because a traveller is often not in the region they
+   * are from.
+   */
+  region: Region;
+  /**
+   * IANA timezone backing `region`. Kept separately because the hemisphere
+   * depends on the timezone, and a coarse region like "oceania" spans the
+   * equator.
+   */
+  timeZone: string | null;
+  /**
+   * Which of the two colour themes the page is using. Follows the reader's own
+   * clock until they override it, and is independent of the season: a monsoon
+   * night looks different from a monsoon afternoon without either of them
+   * changing which effect is on screen.
+   */
+  timeOfDay: TimeOfDay;
+  /** True once the reader has chosen a time of day, which stops the clock overriding them. */
+  timeOfDayPinned: boolean;
+  /** Which season the page weather is showing, for the current region. */
+  season: Season;
+  /** Effect the current season maps to. Derived, never set directly. */
+  weather: WeatherKind;
 };
+
+/** The region and its derived season/weather before the browser reports a timezone. */
+function initialWeatherState(): Pick<
+  LandingState,
+  'region' | 'timeZone' | 'timeOfDay' | 'timeOfDayPinned' | 'season' | 'weather'
+> {
+  return {
+    region: DEFAULT_REGION,
+    timeZone: null,
+    // Day, not the clock: the first frame is the lighter theme, which is the
+    // safer default to paint briefly than a dark page.
+    timeOfDay: 'day',
+    timeOfDayPinned: false,
+    season: DEFAULT_SEASON,
+    weather: SEASON_WEATHER[DEFAULT_SEASON],
+  };
+}
+
+/** The browser's IANA timezone, or null where Intl is unavailable. */
+function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validate a region id that arrived from outside the bundle.
+ *
+ * The value comes from the profile API, so it is not guaranteed to be one of
+ * our ids — a renamed or hand-edited row would otherwise resolve to
+ * `undefined` and fall through to a blank season with no error.
+ */
+function parseRegion(value: unknown): Region | null {
+  const known = new Set<string>(REGION_OPTIONS.map((o) => o.id));
+  return typeof value === 'string' && known.has(value) ? (value as Region) : null;
+}
 
 const initialState: LandingState = {
   heroStep: 0,
@@ -67,6 +146,7 @@ const initialState: LandingState = {
   activeSection: SECTION_IDS.hero,
   scrollProgress: 0,
   reducedMotion: false,
+  ...initialWeatherState(),
 };
 
 type Action =
@@ -80,7 +160,12 @@ type Action =
   | { type: 'CLOSE_CARD' }
   | { type: 'SET_ACTIVE_SECTION'; section: SectionId }
   | { type: 'SET_SCROLL_PROGRESS'; progress: number }
-  | { type: 'SET_REDUCED_MOTION'; reduced: boolean };
+  | { type: 'SET_REDUCED_MOTION'; reduced: boolean }
+  | { type: 'SET_REGION'; region: Region; timeZone: string | null }
+  | { type: 'SET_TIME_OF_DAY'; timeOfDay: TimeOfDay }
+  | { type: 'SET_TIME_OF_DAY_FROM_CLOCK'; timeOfDay: TimeOfDay }
+  | { type: 'FOLLOW_CLOCK'; timeOfDay: TimeOfDay }
+  | { type: 'SET_SEASON'; season: Season };
 
 function reducer(state: LandingState, action: Action): LandingState {
   switch (action.type) {
@@ -114,6 +199,40 @@ function reducer(state: LandingState, action: Action): LandingState {
       return { ...state, scrollProgress: action.progress };
     case 'SET_REDUCED_MOTION':
       return { ...state, reducedMotion: action.reduced };
+    case 'SET_REGION': {
+      // The whole point of region: the season is a function of where the reader
+      // is, so both are recomputed together. Any manually chosen season is
+      // dropped, because keeping it would freeze the page into a season that
+      // contradicts the region it is supposedly themed for.
+      const season = resolveSeason(new Date(), action.region, action.timeZone);
+      return {
+        ...state,
+        region: action.region,
+        timeZone: action.timeZone,
+        season,
+        weather: SEASON_WEATHER[season],
+      };
+    }
+    case 'SET_TIME_OF_DAY':
+      // Any explicit pick pins the choice. Without this the clock would undo
+      // the reader's selection on the next tick, which is the behaviour that
+      // makes a day/night toggle feel broken.
+      return { ...state, timeOfDay: action.timeOfDay, timeOfDayPinned: true };
+    case 'FOLLOW_CLOCK':
+      // The explicit "follow the clock" action. Sets the value and unpins it
+      // in one dispatch, so the theme changes now and keeps tracking later.
+      if (!state.timeOfDayPinned && state.timeOfDay === action.timeOfDay) return state;
+      return { ...state, timeOfDay: action.timeOfDay, timeOfDayPinned: false };
+    case 'SET_TIME_OF_DAY_FROM_CLOCK':
+      // Guarded on both sides: the reducer refuses to move off a pinned choice,
+      // and returns the same object when nothing changed so the minute tick
+      // that fires 1440 times a day does not re-render the page.
+      if (state.timeOfDayPinned || state.timeOfDay === action.timeOfDay) return state;
+      return { ...state, timeOfDay: action.timeOfDay };
+    case 'SET_SEASON':
+      // Weather is derived from the season, never set on its own, so the two
+      // can never drift out of sync.
+      return { ...state, season: action.season, weather: SEASON_WEATHER[action.season] };
     default:
       return state;
   }
@@ -139,6 +258,20 @@ export type LandingActions = {
   setFlipDelayMs: (ms: number) => void;
   setActiveSection: (section: SectionId) => void;
   setReducedMotion: (reduced: boolean) => void;
+  /**
+   * Theme the weather for a region. Recomputes the season for the new region,
+   * so this also resets a manually chosen season.
+   */
+  setRegion: (region: Region) => void;
+  /**
+   * Switch between the day and night themes. Pins the choice, so the clock
+   * stops overriding it.
+   */
+  setTimeOfDay: (timeOfDay: TimeOfDay) => void;
+  /** Hand control back to the reader's local clock. */
+  followClock: () => void;
+  /** Switch the page weather to another season. */
+  setSeason: (season: Season) => void;
   /** Smooth-scroll to any section on the page. */
   scrollToSection: (id: string) => void;
 };
@@ -159,6 +292,15 @@ export function LandingPageProvider({ children }: { children: ReactNode }) {
   // timer is owned by the page rather than by whichever card started it.
   const dwellTimer = useRef<number | null>(null);
 
+  // Mirror of the reducer state for effects that must read it without
+  // re-subscribing. The clock tick checks the pin flag through this.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Region supplied by the signed-in user, e.g. "southAsia". `null` means the
+  // reader has not told us where they are from, so the timezone stands in.
+  const [profileRegion, setProfileRegion] = useState<Region | null>(null);
+
   const clearDwell = useCallback(() => {
     if (dwellTimer.current !== null) {
       window.clearTimeout(dwellTimer.current);
@@ -167,6 +309,42 @@ export function LandingPageProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => clearDwell, [clearDwell]);
+
+  /**
+   * Theme the weather for wherever the reader actually is, on mount.
+   *
+   * This runs after first paint rather than during the initial render because
+   * the timezone has to be read off `Intl`, and doing that in a lazy initial
+   * state would run it on every render. The default-region state stands for the
+   * first frame, so there is no flash of a mismatched season, only one frame
+   * of the default.
+   */
+  useEffect(() => {
+    const timeZone = browserTimeZone();
+    dispatch({ type: 'SET_REGION', region: profileRegion ?? detectRegion(), timeZone });
+  }, [profileRegion]);
+
+  // The signed-in user's stored home region wins over the browser timezone: a
+  // traveller planning a trip from home is not in the region they are reading
+  // about, and the product is India-first while most of its readers are not.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchUserProfile()
+      .then((profile) => {
+        if (cancelled || !profile) return;
+        const stored = parseRegion(profile.home_region?.value);
+        if (stored) setProfileRegion(stored);
+      })
+      .catch(() => {
+        // A failed profile fetch is not an error worth surfacing: the page
+        // simply falls back to the browser timezone.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const actions = useMemo<LandingActions>(
     () => ({
@@ -204,6 +382,12 @@ export function LandingPageProvider({ children }: { children: ReactNode }) {
       setFlipDelayMs: ms => dispatch({ type: 'SET_FLIP_DELAY_MS', ms }),
       setActiveSection: section => dispatch({ type: 'SET_ACTIVE_SECTION', section }),
       setReducedMotion: reduced => dispatch({ type: 'SET_REDUCED_MOTION', reduced }),
+      setRegion: region =>
+        dispatch({ type: 'SET_REGION', region, timeZone: browserTimeZone() }),
+      setTimeOfDay: timeOfDay => dispatch({ type: 'SET_TIME_OF_DAY', timeOfDay }),
+      followClock: () =>
+        dispatch({ type: 'FOLLOW_CLOCK', timeOfDay: resolveTimeOfDay(new Date()) }),
+      setSeason: season => dispatch({ type: 'SET_SEASON', season }),
       scrollToSection: id => {
         document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
       },
@@ -218,6 +402,27 @@ export function LandingPageProvider({ children }: { children: ReactNode }) {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       dispatch({ type: 'SET_REDUCED_MOTION', reduced: true });
     }
+  }, []);
+
+  /**
+   * Follow the reader's clock, so someone opening the page at 2am gets the
+   * night theme without touching anything.
+   *
+   * Checked every minute rather than only on mount: a tab left open across
+   * dusk would otherwise keep the morning palette. The tick is skipped once
+   * the reader has picked a theme, so a pinned choice is never undone. It
+   * reads the flag through a ref rather than closing over `state`, because
+   * depending on it would tear down and rebuild the timer on every change.
+   */
+  useEffect(() => {
+    const sync = () => {
+      if (stateRef.current.timeOfDayPinned) return;
+      dispatch({ type: 'SET_TIME_OF_DAY_FROM_CLOCK', timeOfDay: resolveTimeOfDay(new Date()) });
+    };
+
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
   }, []);
 
   // Page-level scroll tracking. One listener for the whole page rather than one

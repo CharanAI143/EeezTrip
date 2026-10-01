@@ -459,6 +459,7 @@ export interface UserProfileData {
   preferred_transport: { value: any; confidence: number; source: string; updated_at: string };
   hotel_style: { value: any; confidence: number; source: string; updated_at: string };
   activity_pacing: { value: any; confidence: number; source: string; updated_at: string };
+  home_region: { value: any; confidence: number; source: string; updated_at: string };
   food_interest: { value: any; confidence: number; source: string; updated_at: string };
   nature_interest: { value: any; confidence: number; source: string; updated_at: string };
   museum_interest: { value: any; confidence: number; source: string; updated_at: string };

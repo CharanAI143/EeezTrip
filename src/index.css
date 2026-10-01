@@ -471,6 +471,105 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
   min-height: 100vh;
   --lp-progress: 0;
+  --lp-ground: transparent;
+  --lp-ink: #0f172a;
+  --lp-ink-soft: #334155;
+  --lp-panel: rgba(255, 255, 255, 0.82);
+  --lp-panel-border: rgba(255, 255, 255, 0.6);
+  --lp-alt-band: rgba(224, 242, 254, 0.4);
+}
+
+/* ── Night theme ──
+   The page ground, the ink and the panel tints are the three things that have
+   to change for a day/night switch to read as a theme rather than as an
+   inverted filter. Set as custom properties on the page root so the sections
+   and the weather veils can both reach them, and so a future third theme is a
+   new block here rather than a new selector per component.
+
+   The hero's own gradient is set inline by HeroSection, so it is overridden
+   through this variable rather than by editing that component. */
+.lp-page[data-tod='night'] {
+  --lp-ground: #070d1c;
+  --lp-ink: #e6edf7;
+  --lp-ink-soft: #a8bad4;
+  --lp-panel: rgba(15, 27, 51, 0.78);
+  --lp-panel-border: rgba(148, 178, 226, 0.22);
+  --lp-alt-band: rgba(12, 24, 46, 0.5);
+  color: var(--lp-ink);
+  background: var(--lp-ground);
+  /* A short cross-fade, so switching does not snap. Kept well under the 300ms
+     threshold where a full-viewport repaint starts to feel like a flicker. */
+  transition: background-color 240ms ease, color 240ms ease;
+}
+
+.lp-page[data-tod='night'] .lp-hero {
+  background: linear-gradient(160deg, #0b1730 0%, #101c38 45%, #081227 100%);
+}
+
+.lp-page[data-tod='night'] .lp-section-alt {
+  background: linear-gradient(180deg, transparent, var(--lp-alt-band), transparent);
+}
+
+.lp-page[data-tod='night'] .glass,
+.lp-page[data-tod='night'] .glass-card {
+  background: var(--lp-panel);
+  border-color: var(--lp-panel-border);
+}
+
+/* ── Day / night toggle ──
+   Fixed to the bottom-left, clear of the chat bubble on the right and the
+   navbar above, so it stays reachable while scrolling without ever sitting over
+   a primary CTA. */
+.lp-tod {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--lp-panel);
+  border: 1px solid var(--lp-panel-border);
+  box-shadow: 0 6px 22px rgba(2, 8, 23, 0.18);
+  backdrop-filter: blur(10px);
+  transition: background-color 240ms ease, border-color 240ms ease;
+}
+
+.lp-tod__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lp-ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.lp-tod__btn:hover {
+  color: var(--lp-ink);
+}
+
+.lp-tod__btn[data-active='true'] {
+  /* An opaque fill, not a tint, so the selected option stays obvious against
+     the translucent pill background in both themes. */
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.lp-tod__btn--auto {
+  margin-left: 2px;
+  padding: 7px 11px;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 /* Alternating band, used by both the how-it-works and features sections. */
@@ -627,12 +726,12 @@ h1, h2, h3, h4, h5, h6 {
   .kanchenjunga { transition: none; }
 }
 
-/* ── Snowfall ──
-   Page-wide, fixed, so it keeps falling over every section as the reader
+/* ── Seasonal weather layer ──
+   Page-wide, fixed, so it keeps playing over every section as the reader
    scrolls. Below the navbar/chat (z-100 / z-200) and above the section content
    (z-1), so navigation and CTAs stay crisp while the weather reads in front of
-   the scenery. */
-.snowfall {
+   the scenery. One container, one effect at a time, chosen by `data-kind`. */
+.weather-layer {
   position: fixed;
   inset: 0;
   z-index: 90;
@@ -640,18 +739,222 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-.snowfall-flake {
+/* Each kind tints the whole viewport. The veil is what actually sells the
+   season at a glance; the particles only carry the motion. */
+.weather-veil {
+  position: absolute;
+  inset: 0;
+  transition: opacity 600ms ease;
+}
+
+/* ── Time of day ──
+   Two passes over the same four veils. Day is a light cast that tints without
+   darkening; night replaces the page ground with a deep blue and uses much
+   stronger veils, because a translucent light wash is nearly invisible against
+   a dark background and the season would stop reading. Kept as a separate
+   block rather than mixing both into the base rules so each theme's values can
+   be read against each other directly. */
+
+.weather-layer[data-tod='night'] .weather-veil--rain {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(30, 58, 96, 0.55) 0%, rgba(8, 20, 38, 0.75) 100%),
+    linear-gradient(180deg, rgba(6, 18, 34, 0.55) 0%, rgba(3, 10, 22, 0.8) 100%);
+}
+
+.weather-layer[data-tod='night'] .weather-veil--sun {
+  /* Moonlight rather than a second sunrise: cool, and much dimmer, so a
+     "summer" night does not read as a bright afternoon. */
+  background:
+    radial-gradient(90% 70% at 78% 8%, rgba(148, 178, 226, 0.34) 0%, rgba(63, 92, 138, 0.18) 42%, transparent 70%),
+    linear-gradient(180deg, rgba(14, 30, 56, 0.5) 0%, rgba(6, 14, 30, 0.6) 100%);
+}
+
+.weather-layer[data-tod='night'] .weather-veil--wind {
+  background:
+    radial-gradient(100% 60% at 20% 10%, rgba(148, 163, 184, 0.30) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(18, 28, 46, 0.5) 0%, rgba(8, 14, 28, 0.68) 100%);
+}
+
+.weather-layer[data-tod='night'] .weather-veil--snow {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(120, 150, 190, 0.34) 0%, rgba(30, 48, 76, 0.5) 100%),
+    linear-gradient(180deg, rgba(8, 18, 34, 0.5) 0%, rgba(4, 10, 22, 0.7) 100%);
+}
+
+/* Night particles are lit rather than emissive. Flakes and motes are backed by
+   a glow that disappears on a dark ground, so they are given a solid core
+   instead; the streaks keep their gradient but cool toward the moonlit tone. */
+.weather-layer[data-tod='night'] .weather-wind-streak {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 178, 226, 0) 0%,
+    rgba(148, 178, 226, 0.3) 20%,
+    rgba(178, 200, 235, 0.52) 50%,
+    rgba(148, 178, 226, 0.3) 80%,
+    rgba(148, 178, 226, 0) 100%
+  );
+}
+
+.weather-layer[data-tod='night'] .weather-wind-dust {
+  background: rgba(178, 197, 226, 0.85);
+}
+
+.weather-layer[data-tod='night'] .weather-drop {
+  background: linear-gradient(
+    180deg,
+    rgba(186, 214, 245, 0) 0%,
+    rgba(186, 214, 245, 0.85) 45%,
+    rgba(150, 186, 226, 0.55) 100%
+  );
+  box-shadow: none;
+}
+
+.weather-layer[data-tod='night'] .weather-flake {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #dce9f8 55%, #b9cfe6 100%);
+  box-shadow: 0 0 5px rgba(200, 222, 248, 0.45);
+}
+
+.weather-layer[data-tod='night'] .weather-mote {
+  background: radial-gradient(circle at 35% 35%, #e8eefb 0%, #b9cbe6 100%);
+  box-shadow: 0 0 6px rgba(190, 210, 240, 0.4);
+}
+
+.weather-veil--rain {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(148, 197, 231, 0.30) 0%, rgba(30, 74, 112, 0.46) 100%),
+    linear-gradient(180deg, rgba(12, 44, 74, 0.46) 0%, rgba(8, 32, 58, 0.60) 100%);
+}
+
+.weather-veil--sun {
+  background:
+    radial-gradient(90% 70% at 78% 8%, rgba(253, 224, 71, 0.44) 0%, rgba(251, 191, 36, 0.20) 42%, transparent 70%),
+    linear-gradient(180deg, rgba(255, 214, 140, 0.32) 0%, rgba(255, 244, 214, 0.16) 100%);
+}
+
+/* Carried a little heavier than the other veils. The wind streaks are the
+   lowest-contrast effect in the layer, so the haze behind them is what makes
+   the season legible at a glance rather than leaving the field nearly
+   invisible against the hero. */
+.weather-veil--wind {
+  background:
+    radial-gradient(100% 60% at 20% 10%, rgba(214, 211, 209, 0.44) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(180, 175, 170, 0.40) 0%, rgba(120, 113, 108, 0.50) 100%);
+}
+
+.weather-veil--snow {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(226, 242, 253, 0.44) 0%, rgba(148, 197, 231, 0.36) 100%);
+}
+
+/* ── Rain ──
+   A drop in motion is a line, so each drop is a stretched streak on a lean.
+   The fall is fast and the sideways drift slower, which is what separates
+   wind-blown rain from flat vertical hatching. */
+.weather-drop {
+  position: absolute;
+  top: -14vh;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(219, 242, 255, 0) 0%,
+    rgba(219, 242, 255, 0.85) 55%,
+    rgba(191, 226, 248, 0.95) 100%
+  );
+  will-change: transform;
+  animation: weather-fall var(--dr-fall) linear var(--dr-delay) infinite;
+}
+
+@keyframes weather-fall {
+  0%   { transform: translate3d(0, -14vh, 0) rotate(var(--dr-lean)); }
+  100% { transform: translate3d(-6vw, 116vh, 0) rotate(var(--dr-lean)); }
+}
+
+/* ── Sunny ──
+   Nothing falls on a clear day; the light breathes and the dust drifts up. */
+.weather-mote {
+  position: absolute;
+  bottom: -8vh;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbeb 0%, #fde68a 100%);
+  box-shadow: 0 0 8px rgba(253, 224, 71, 0.6);
+  will-change: transform, opacity;
+  animation: weather-rise var(--mo-rise) linear var(--mo-delay) infinite;
+}
+
+@keyframes weather-rise {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate3d(var(--mo-sway), -50vh, 0); }
+  85%  { opacity: 1; }
+  100% { transform: translate3d(0, -104vh, 0); opacity: 0; }
+}
+
+/* ── Wind ──
+   Streaks and dust, not shapes. A streak fades to nothing at both ends, so it
+   has no hard edge to read as a moving object, and it travels right across the
+   frame and off it instead of returning to its origin. Each keyframe is
+   `linear` in time and offset by a negative delay, so strands are already
+   distributed across the frame at first paint instead of all entering together.
+   The midpoint keyframe lifts or drops the streak by --wd-bob, which is what
+   keeps the paths from being perfectly parallel. */
+.weather-wind-streak {
+  position: absolute;
+  left: -30vw;
+  border-radius: 999px;
+  /* Long, gradual falloff rather than a bright core with fast ramps. A hard
+     ramp into a bright band is what reads as glare; spreading the same total
+     opacity over more of the strand keeps it clearly visible while staying
+     even along its length. */
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0) 0%,
+    rgba(226, 232, 240, 0.28) 20%,
+    rgba(240, 246, 252, 0.5) 50%,
+    rgba(226, 232, 240, 0.28) 80%,
+    rgba(226, 232, 240, 0) 100%
+  );
+  will-change: transform, opacity;
+  animation: weather-wind-streak var(--wd-duration) linear var(--wd-delay) infinite;
+}
+
+@keyframes weather-wind-streak {
+  0%   { transform: translate3d(0, 0, 0) rotate(var(--wd-lean)); }
+  50%  { transform: translate3d(78vw, var(--wd-bob), 0) rotate(var(--wd-lean)); }
+  100% { transform: translate3d(156vw, 0, 0) rotate(var(--wd-lean)); }
+}
+
+.weather-wind-dust {
+  position: absolute;
+  left: -10vw;
+  border-radius: 50%;
+  /* Slightly blue-grey rather than white, so a mote crossing the lighter parts
+     of the hero stays visible instead of disappearing into them. */
+  background: rgba(214, 222, 232, 0.8);
+  will-change: transform, opacity;
+  animation: weather-wind-dust var(--wd-duration) linear var(--wd-delay) infinite;
+}
+
+/* Slower than the streaks, and on a wider arc: the field needs a second,
+   lazier component or every element moves at the same apparent speed. */
+@keyframes weather-wind-dust {
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(55vw, calc(var(--wd-bob) * -1.6), 0); }
+  100% { transform: translate3d(110vw, 0, 0); }
+}
+
+/* ── Snow ──
+   The original effect: round flakes that drop while weaving an S. The S-path
+   comes from the drift reversing between the keyframes. */
+.weather-flake {
   position: absolute;
   top: -6vh;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #ffffff 0%, #e8f6ff 55%, #cbeafc 100%);
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.55);
   will-change: transform, opacity;
+  animation: snow-drift var(--fl-fall) linear var(--fl-delay) infinite;
 }
 
-/* The fall and the flutter are two offsets on the same transform, so a flake
-   drops while weaving. The S-path comes from the drift reversing between the
-   keyframes. */
 @keyframes snow-drift {
   0%   { transform: translate3d(calc(var(--fl-drift) * -0.5), -6vh, 0); }
   25%  { transform: translate3d(calc(var(--fl-drift) * 0.6), 22vh, 0); }
@@ -660,17 +963,25 @@ h1, h2, h3, h4, h5, h6 {
   100% { transform: translate3d(calc(var(--fl-drift) * -0.4), 112vh, 0); }
 }
 
-.snowfall-flake {
-  animation: snow-drift var(--fl-fall) linear var(--fl-delay) infinite;
-}
-
-.snowfall[data-still='true'] .snowfall-flake {
+/* ── Still ──
+   The page's own reduced-motion switch and the OS setting both land here. The
+   veil stays, so the season still reads as a colour cast; only the movement
+   stops. */
+.weather-layer[data-still='true'] .weather-drop,
+.weather-layer[data-still='true'] .weather-mote,
+.weather-layer[data-still='true'] .weather-wind-streak,
+.weather-layer[data-still='true'] .weather-wind-dust,
+.weather-layer[data-still='true'] .weather-flake {
   animation: none;
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .snowfall-flake {
+  .weather-drop,
+  .weather-mote,
+  .weather-wind-streak,
+  .weather-wind-dust,
+  .weather-flake {
     animation: none;
     opacity: 0;
   }

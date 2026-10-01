@@ -6,7 +6,8 @@ import DestinationsSection from '../components/landing/DestinationsSection';
 import FeaturesSection from '../components/landing/FeaturesSection';
 import CtaSection from '../components/landing/CtaSection';
 import LandingFooter from '../components/landing/LandingFooter';
-import Snowfall from '../components/landing/Snowfall';
+import WeatherLayer from '../components/landing/WeatherLayer';
+import TimeOfDayToggle from '../components/landing/TimeOfDayToggle';
 
 // Re-exported so the tests can advance timers by the real values instead of
 // hardcoded copies that silently drift when these change.
@@ -25,8 +26,13 @@ function LandingShell() {
     <div
       className="lp-page"
       data-section={state.activeSection}
+      data-region={state.region}
+      data-season={state.season}
+      data-weather={state.weather}
+      data-tod={state.timeOfDay}
       style={{ '--lp-progress': state.scrollProgress } as React.CSSProperties}
     >
+      <TimeOfDayToggle />
       <HeroSection />
       <StatsSection />
       <HowItWorksSection />
@@ -34,7 +40,7 @@ function LandingShell() {
       <FeaturesSection />
       <CtaSection />
       <LandingFooter />
-      <Snowfall />
+      <WeatherLayer />
     </div>
   );
 }
