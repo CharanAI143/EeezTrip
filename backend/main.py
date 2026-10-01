@@ -867,21 +867,52 @@ def chat(req: ChatRequest):
     return ChatResponse(reply=reply)
 
 
-def _orchestrate_chat(messages: List[ChatMessage]) -> str:
-    """Try each available chat provider in turn, returning the first real reply."""
-    from backend.app.providers.ai.factory import AIProviderFactory
+# The chat window is small and conversational, so the reply contract is hard
+# rules rather than a vague "be concise". Without these the model happily
+# greets with a numbered, bolded, emoji-decorated interview that asks for the
+# departure city, destination type, dates and budget all in one breath.
+_CHAT_SYSTEM_INSTRUCTION = (
+    "You are EeezTrip's travel assistant, chatting in a small message window like a friend.\n"
+    "HARD FORMAT RULES - these are never broken:\n"
+    "- Maximum two short sentences, roughly 25 words total.\n"
+    "- Ask at most ONE question per reply, and only when you genuinely need it.\n"
+    "- No numbered lists, no bullet points, no markdown, no bold, no headings, no emoji.\n"
+    "- Plain conversational sentences only, the way someone would type into a chat bubble.\n"
+    "BEHAVIOUR RULES:\n"
+    "- Learn about the trip gradually, one thing per turn. Never interview the user.\n"
+    "- Never bundle future deliverables into one message. Do not announce that you will "
+    "later provide transport, stays, a budget breakdown, or visa notes. Earn them turn by turn.\n"
+    "- If the user just says hello, greet them and ask only for the single most useful next detail.\n"
+    "- Answer the question that was asked first, then stop. Offer at most one optional follow-up."
+)
 
-    system_instruction = (
-        "You are EeezTrip's travel assistant. Keep answers concise, practical, and friendly. "
-        "Focus on travel planning, destinations, budgets, transport, visas, and safety tips."
-    )
-    recent = [
-        {
-            "role": m.role if m.role in {"user", "assistant", "system"} else "user",
-            "content": m.content[:2000],
-        }
-        for m in messages[-8:]
-    ]
+# Offline copy obeys the same one-question rule as the live path.
+_CHAT_OFFLINE_REPLY = (
+    "I'm offline right now, so my AI services aren't reachable. "
+    "Where are you thinking of going?"
+)
+
+
+def _looks_like_report(reply: str) -> bool:
+    """True when a reply has slipped into report/markdown mode.
+
+    The chat is conversational, so a markdown table, a multi-item numbered list
+    or a wall of bold markers means the model ignored the format contract.
+    """
+    if len(reply) > 600:
+        return True
+    if re.search(r"\|\s*-{2,}", reply):  # markdown table separator
+        return True
+    if len(re.findall(r"^\s*\d+[.)]\s", reply, re.MULTILINE)) >= 2:
+        return True
+    if reply.count("**") >= 4:
+        return True
+    return False
+
+
+def _generate_chat_reply(system_instruction: str, transcript: List[Dict[str, str]]) -> str:
+    """Return the first usable reply from the provider chain."""
+    from backend.app.providers.ai.factory import AIProviderFactory
 
     for provider_name in AIProviderFactory.provider_chain():
         try:
@@ -891,7 +922,7 @@ def _orchestrate_chat(messages: List[ChatMessage]) -> str:
             # Chat is conversational, so the reply must not be forced into a
             # JSON object - the string is shown to the user verbatim.
             reply = provider.generate_text(
-                _flatten_for_chat(system_instruction, recent),
+                _flatten_for_chat(transcript),
                 system_instruction,
                 json_mode=False,
             )
@@ -900,14 +931,54 @@ def _orchestrate_chat(messages: List[ChatMessage]) -> str:
         except Exception as exc:
             print(f"[Chat] Provider '{provider_name}' failed: {exc}")
 
-    return (
-        "I'm currently offline and can't reach my AI services. I can still help you "
-        "structure a plan — tell me your destination, budget, and trip length."
-    )
+    return ""
 
 
-def _flatten_for_chat(system_instruction: str, messages: List[Dict[str, str]]) -> str:
-    lines = [f"System: {system_instruction}", ""]
+def _orchestrate_chat(messages: List[ChatMessage]) -> str:
+    """Answer a chat turn, enforcing the one-question conversational contract."""
+    # The frontend sends its trip context as a `system` message. It is folded
+    # into the single system prompt as inert reference data. It used to be
+    # flattened into the transcript under a second "System:" heading, which put
+    # two competing system prompts in front of the model and made it imitate the
+    # context's report formatting instead of following the chat rules.
+    context_parts = [m.content.strip() for m in messages if m.role == "system" and m.content.strip()]
+
+    system_instruction = _CHAT_SYSTEM_INSTRUCTION
+    if context_parts:
+        system_instruction = (
+            f"{system_instruction}\n\nTRIP CONTEXT (internal data for grounding only - never restate it, "
+            f"never format it, never open with it):\n" + "\n".join(context_parts)
+        )
+
+    transcript = [
+        {"role": m.role, "content": m.content[:2000]}
+        for m in messages
+        if m.role in {"user", "assistant"}
+    ][-8:]
+
+    reply = _generate_chat_reply(system_instruction, transcript)
+    if not reply:
+        return _CHAT_OFFLINE_REPLY
+
+    # One retry if the model ignored the format contract, which is the single
+    # most visible failure mode in this UI.
+    if _looks_like_report(reply):
+        print("[Chat] Reply drifted into report mode; retrying with a stricter instruction.")
+        retry_instruction = (
+            f"{system_instruction}\n\n"
+            "Your previous attempt was rejected because it was formatted as a long report. "
+            "Reply again as two plain conversational sentences with at most one question. "
+            "No tables, no lists, no bold, no headings, no emoji."
+        )
+        retry = _generate_chat_reply(retry_instruction, transcript)
+        if retry:
+            reply = retry
+
+    return reply
+
+
+def _flatten_for_chat(messages: List[Dict[str, str]]) -> str:
+    lines: List[str] = []
     for message in messages:
         lines.append(f"{message['role'].capitalize()}: {message['content']}")
     lines.append("Assistant:")

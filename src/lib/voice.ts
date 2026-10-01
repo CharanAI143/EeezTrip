@@ -175,11 +175,31 @@ export class VoiceAssistant {
     try {
       synth.cancel();
 
-      // Clean markdown or special chars for better speech clarity
-      const cleanText = text
-        .replace(/[*_#~`]/g, '')
-        .replace(/\[.*?\]\(.*?\)/g, '')
-        .slice(0, 400);
+      // Clean markdown, emoji and special chars for better speech clarity.
+      const MAX_CHARS = 400;
+      const stripped = text
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/[*_#~`>|]/g, '')
+        .replace(/\p{Extended_Pictographic}/gu, ' ')
+        .replace(/\p{Regional_Indicator}/gu, ' ')
+        .replace(/[^\S\n]+/g, ' ')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+
+      // Cut on a sentence (then word) boundary so speech never stops mid-word.
+      let cleanText = stripped;
+      if (stripped.length > MAX_CHARS) {
+        const window = stripped.slice(0, MAX_CHARS);
+        const sentenceEnd = Math.max(
+          window.lastIndexOf('. '),
+          window.lastIndexOf('! '),
+          window.lastIndexOf('? '),
+          window.lastIndexOf('\n'),
+        );
+        const cut = sentenceEnd > MAX_CHARS * 0.5 ? sentenceEnd + 1 : window.lastIndexOf(' ');
+        cleanText = (cut > 0 ? window.slice(0, cut) : window).trim();
+      }
 
       if (!cleanText.trim()) {
         onEnd?.();

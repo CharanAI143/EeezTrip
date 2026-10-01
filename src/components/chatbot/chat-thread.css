@@ -1,0 +1,183 @@
+/*
+ * Chat thread layout contract — text can never spill or get clipped.
+ *
+ * Rules (non-negotiable):
+ *   1. Every text-bearing box in the chain has `min-width: 0` so flex can
+ *      never push content past the column.
+ *   2. The bubble group is `flex-basis: auto` + `max-width: 80%`, so it
+ *      shrink-fits to its text (toast-style) and never exceeds 80% of the
+ *      column. The cap lives on the group because the assistant bubble also
+ *      carries a read-aloud button underneath it.
+ *   3. Wrapping is forced by `overflow-wrap: anywhere` (stronger than
+ *      `break-word`) + `word-break: break-word` + `white-space: pre-wrap`,
+ *      so even an unbroken 1000-char token wraps inside the bubble.
+ *   4. `padding: 16px` == `border-radius: 16px`, so the rounded corners can
+ *      never intersect a glyph (this is what "text cut at corners" is).
+ *   5. No `overflow: hidden/auto` on the bubble. Nothing can exceed it, so
+ *      there is nothing to hide — hiding things is what used to cut text.
+ *   6. Rows are capped at `max-width: 100%` of the log, so no bubble can
+ *      ever push the panel edge.
+ */
+.chat-log {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-row {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chat-row--bot {
+  justify-content: flex-start;
+}
+
+.chat-row--user {
+  justify-content: flex-end;
+}
+
+.chat-row__line {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chat-row--user .chat-row__line {
+  flex-direction: row-reverse;
+}
+
+/* The assistant avatar must stay level with the bubble, not the button below it. */
+.chat-row--bot .chat-row__line {
+  align-items: flex-start;
+}
+
+.bubble-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  max-width: 80%;
+}
+
+.chat-row--user .bubble-group {
+  align-items: flex-end;
+}
+
+/* The 80% cap is enforced by the group; the bubble just fills it. */
+.bubble-group > .bubble {
+  max-width: 100%;
+}
+
+.bubble__read-aloud {
+  flex: 0 0 auto;
+}
+
+.chat-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.12);
+}
+
+.chat-avatar--bot {
+  border: 1px solid #e0f2fe;
+  background: #ffffff;
+  color: #0369a1;
+}
+
+.chat-avatar--user {
+  background: #ec4899;
+  color: #ffffff;
+}
+
+.bubble {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 80%;
+  box-sizing: border-box;
+  padding: 16px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bubble--bot {
+  border: 1px solid #e0f2fe;
+  border-bottom-left-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f0f9ff);
+  color: #334155;
+  box-shadow: 0 8px 20px -12px rgba(2, 132, 199, 0.45);
+}
+
+.bubble--user {
+  border-bottom-right-radius: 8px;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7, #ec4899);
+  color: #ffffff;
+  box-shadow: 0 10px 24px -14px rgba(2, 132, 199, 0.5);
+}
+
+.bubble__text {
+  margin: 0;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 80%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border-bottom-left-radius: 8px;
+  border: 1px solid #e0f2fe;
+  background: #ffffff;
+  box-shadow: 0 6px 16px -12px rgba(2, 132, 199, 0.5);
+}
+
+.thinking__dots {
+  display: flex;
+  gap: 4px;
+}
+
+.thinking__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+}
+
+.thinking__dot--sky {
+  background: #0ea5e9;
+}
+
+.thinking__dot--pink {
+  background: #ec4899;
+}
+
+.thinking__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #94a3b8;
+  white-space: nowrap;
+}

@@ -344,6 +344,16 @@ h1, h2, h3, h4, h5, h6 {
   outline-offset: 2px;
 }
 
+/* The chat composer must not get the rectangular outline above. This rule is
+   unlayered on purpose: Tailwind's `outline-none` utility lives in
+   `@layer utilities`, and unlayered styles win over layered ones regardless of
+   specificity, so a utility class alone cannot suppress this. */
+.chat-composer:focus-visible,
+.chat-composer input:focus-visible,
+.chat-composer textarea:focus-visible {
+  outline: none;
+}
+
 /* .btn already carries a glow shadow, so reinforce the ring rather than swap it. */
 .btn:focus-visible {
   outline: 3px solid var(--ice-600);
