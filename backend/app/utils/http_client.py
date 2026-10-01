@@ -5,14 +5,55 @@ Centralises timeout, retry and error normalisation so every provider in
 """
 
 import re
+import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import requests
 
 DEFAULT_TIMEOUT_SEC = 10
 MAX_ATTEMPTS = 2
 RETRY_BACKOFF_SEC = 0.4
+
+# A trip request fires eight of these lookups at once to enrich an estimate
+# that already has a deterministic fallback. When the upstream is slow or
+# blocked, every one of them sits on its own timeout and the user waits tens of
+# seconds for data that is optional. Once a host has failed this many times,
+# stop paying for it until the cooldown passes.
+CIRCUIT_FAIL_THRESHOLD = 2
+CIRCUIT_OPEN_SEC = 60.0
+
+_circuit_lock = threading.Lock()
+_failing_hosts: Dict[str, List[float]] = {}
+
+
+def _host_of(url: str) -> str:
+    return urlparse(url).netloc or url
+
+
+def _circuit_is_open(url: str) -> bool:
+    now = time.monotonic()
+    host = _host_of(url)
+    with _circuit_lock:
+        stamps = [t for t in _failing_hosts.get(host, []) if now - t < CIRCUIT_OPEN_SEC]
+        if stamps:
+            _failing_hosts[host] = stamps
+            return len(stamps) >= CIRCUIT_FAIL_THRESHOLD
+        _failing_hosts.pop(host, None)
+    return False
+
+
+def _record_failure(url: str) -> None:
+    host = _host_of(url)
+    with _circuit_lock:
+        _failing_hosts.setdefault(host, []).append(time.monotonic())
+
+
+def reset_circuits() -> None:
+    """Forget every tripped circuit. For tests and explicit operator resets."""
+    with _circuit_lock:
+        _failing_hosts.clear()
 
 _PRICE_PATTERNS = (
     re.compile(r"(?:₹|INR|Rs\.?)\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]{3,7})", re.IGNORECASE),
@@ -27,6 +68,9 @@ def fetch_with_retry(
     attempts: int = MAX_ATTEMPTS,
 ) -> Optional[Dict[str, Any]]:
     """GET JSON with one retry. Returns ``None`` instead of raising."""
+    if _circuit_is_open(url):
+        return None
+
     for attempt in range(attempts):
         try:
             response = requests.get(url, params=params, timeout=timeout)
@@ -40,6 +84,8 @@ def fetch_with_retry(
                 return None
             if attempt < attempts - 1:
                 time.sleep(RETRY_BACKOFF_SEC * (attempt + 1))
+
+    _record_failure(url)
     return None
 
 

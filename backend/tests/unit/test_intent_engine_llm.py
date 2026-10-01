@@ -37,7 +37,9 @@ def _engine(monkeypatch, provider_map):
             def is_available(self):
                 return self._key in provider_map
 
-            def generate_text(self, prompt, system_instruction=""):
+            def generate_text(self, prompt, system_instruction="", json_mode=True):
+                # The concierge reply is shown verbatim, so JSON mode must be off.
+                assert json_mode is False, "concierge replies must not request JSON"
                 value = provider_map[self._key]
                 if isinstance(value, Exception):
                     raise value
@@ -124,7 +126,7 @@ async def test_llm_call_does_not_block_event_loop(monkeypatch):
             def is_available(self):
                 return True
 
-            def generate_text(self, prompt, system_instruction=""):
+            def generate_text(self, prompt, system_instruction="", json_mode=True):
                 return slow_generate(None, prompt)
 
         return _Provider()

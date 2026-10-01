@@ -4,6 +4,8 @@ from backend.app.providers.ai.factory import (
     AIProviderFactory,
     BaseLLMProvider,
     GeminiProvider,
+    GenericOpenAICompatibleProvider,
+    GroqProvider,
     OllamaProvider,
     OpenRouterProvider,
     UnavailableProvider,
@@ -37,6 +39,46 @@ def test_factory_returns_real_providers():
     assert isinstance(AIProviderFactory.get_provider("gemini"), GeminiProvider)
     assert isinstance(AIProviderFactory.get_provider("ollama"), OllamaProvider)
     assert isinstance(AIProviderFactory.get_provider("openrouter"), OpenRouterProvider)
+    assert isinstance(AIProviderFactory.get_provider("groq"), GroqProvider)
+    assert isinstance(
+        AIProviderFactory.get_provider("openai-compatible"),
+        GenericOpenAICompatibleProvider,
+    )
+
+
+def test_default_chain_prefers_cloud_over_local_ollama():
+    chain = AIProviderFactory.provider_chain()
+    assert chain.index("ollama") == len(chain) - 1
+    assert "groq" in chain and "openai-compatible" in chain
+
+
+def test_groq_is_available_with_only_an_api_key(monkeypatch):
+    monkeypatch.setattr("backend.app.core.config.settings.GROQ_API_KEY", "gsk_test")
+    monkeypatch.setattr("backend.app.core.config.settings.GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setattr("backend.app.core.config.settings.GROQ_MODEL", "openai/gpt-oss-120b")
+    assert GroqProvider().is_available() is True
+
+
+def test_groq_is_unavailable_without_credentials(monkeypatch):
+    monkeypatch.setattr("backend.app.core.config.settings.GROQ_API_KEY", "")
+    assert GroqProvider().is_available() is False
+
+
+def test_generic_provider_needs_base_url_key_and_model(monkeypatch):
+    monkeypatch.setattr("backend.app.core.config.settings.OPENAI_COMPATIBLE_API_KEY", "sk_test")
+    monkeypatch.setattr("backend.app.core.config.settings.OPENAI_COMPATIBLE_BASE_URL", "http://localhost:8000/v1")
+    monkeypatch.setattr("backend.app.core.config.settings.OPENAI_COMPATIBLE_MODEL", "")
+    assert GenericOpenAICompatibleProvider().is_available() is False
+
+    monkeypatch.setattr("backend.app.core.config.settings.OPENAI_COMPATIBLE_MODEL", "local-model")
+    assert GenericOpenAICompatibleProvider().is_available() is True
+
+
+def test_generic_provider_raises_when_unconfigured():
+    provider = GenericOpenAICompatibleProvider()
+    provider._api_key = ""
+    with pytest.raises(RuntimeError):
+        provider.generate_text("hello")
 
 
 def test_factory_falls_back_to_unavailable_for_unknown_provider():

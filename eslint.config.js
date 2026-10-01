@@ -16,7 +16,7 @@ const JS_FILES = ['**/*.{js,mjs,cjs,jsx,ts,tsx}'];
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'venv/**', '.venv/**'],
   },
 
   {

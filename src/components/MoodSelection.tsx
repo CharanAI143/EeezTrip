@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Zap, Coffee, Ghost, Palmtree, Mountain, Heart, Loader2, ArrowRight, Wallet, Coins } from 'lucide-react';
+import { Sparkles, Zap, Coffee, Ghost, Palmtree, Mountain, Heart, Loader2, ArrowRight, Wallet, Coins, type LucideIcon } from 'lucide-react';
 import { getMoodRecommendations } from '../lib/gemini';
 import { cn } from '../lib/utils';
 import { Currency } from '../types';
@@ -10,7 +10,10 @@ import { SmartImage } from './SmartImage';
 interface Mood {
   id: string;
   label: string;
-  icon: React.ElementType;
+  // LucideIcon rather than React.ElementType: ElementType also admits plain
+  // string tags, whose props resolve to `never` and make <Icon className=...> a
+  // type error. Every icon in this list is a lucide icon.
+  icon: LucideIcon;
   color: string;
   description: string;
 }

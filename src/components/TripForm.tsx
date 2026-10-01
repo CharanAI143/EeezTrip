@@ -72,31 +72,40 @@ export function TripForm({ onSubmit, isLoading }: TripFormProps) {
   };
 
   const handleVoiceData = (data: any) => {
-    if (data.startLocation) setValue('startLocation', data.startLocation);
-    if (data.destination) setValue('destination', data.destination);
-    if (data.budget) setValue('budget', Number(data.budget));
-    if (data.currency) setValue('currency', data.currency as any);
-    if (data.duration) setValue('duration', Number(data.duration));
+    if (data.startLocation) setValue('startLocation', data.startLocation, { shouldValidate: true });
+    if (data.destination) setValue('destination', data.destination, { shouldValidate: true });
+    if (data.budget !== undefined && data.budget !== null) setValue('budget', Number(data.budget), { shouldValidate: true });
+    if (data.currency) setValue('currency', data.currency as any, { shouldValidate: true });
+    if (data.duration) setValue('duration', Number(data.duration), { shouldValidate: true });
+    if (data.travelStyle && TravelStyle.options.includes(data.travelStyle as any)) {
+      setValue('travelStyle', data.travelStyle as any, { shouldValidate: true });
+    }
     
     if (data.tripTypes && Array.isArray(data.tripTypes)) {
       const validTypes = data.tripTypes.filter((t: string) => 
         TripType.options.includes(t as any)
       ) as TripType[];
-      setValue('tripTypes', validTypes);
+      if (validTypes.length > 0) {
+        setValue('tripTypes', validTypes, { shouldValidate: true });
+      }
     }
     
     if (data.preferences && Array.isArray(data.preferences)) {
       const validPrefs = data.preferences.filter((p: string) => 
         Preference.options.includes(p as any)
       ) as Preference[];
-      setValue('preferences', validPrefs);
+      if (validPrefs.length > 0) {
+        setValue('preferences', validPrefs, { shouldValidate: true });
+      }
     }
 
-    // Auto-submit if we have destination
-    if (data.destination) {
+    // Auto-submit if we have both startLocation and destination (or destination with existing start)
+    const effectiveStart = data.startLocation || watch('startLocation');
+    const effectiveDest = data.destination || watch('destination');
+    if (effectiveDest && effectiveStart) {
       setTimeout(() => {
         handleSubmit(onSubmit)();
-      }, 1500);
+      }, 1200);
     }
   };
 

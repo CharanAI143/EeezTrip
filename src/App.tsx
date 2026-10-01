@@ -11,7 +11,7 @@ import ResultsPage from './pages/ResultsPage';
 import BookingPage from './pages/BookingPage';
 import DashboardPage from './pages/DashboardPage';
 import ReviewsPage from './pages/ReviewsPage';
-import { ChatBot } from './components/ChatBot';
+import { ChatBot } from './components/chatbot/ChatBot';
 
 function AppRouter() {
   const { state } = useTripStore();

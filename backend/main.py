@@ -5,7 +5,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from typing import List, Dict, Optional, Any
 import random
-import json
 import io
 import re
 import datetime
@@ -124,6 +123,8 @@ app.add_middleware(
 
 from backend.app.api.v1.router import api_v1_router
 app.include_router(api_v1_router, prefix="/api/v1")
+
+from backend.app.core.config import settings
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from get_images import get_place_images
@@ -887,9 +888,12 @@ def _orchestrate_chat(messages: List[ChatMessage]) -> str:
             provider = AIProviderFactory.get_provider(provider_name)
             if not provider.is_available():
                 continue
-            # generate_text is not schema-driven for chat, so bypass the JSON coercion.
+            # Chat is conversational, so the reply must not be forced into a
+            # JSON object - the string is shown to the user verbatim.
             reply = provider.generate_text(
-                _flatten_for_chat(system_instruction, recent), system_instruction
+                _flatten_for_chat(system_instruction, recent),
+                system_instruction,
+                json_mode=False,
             )
             if reply and reply.strip():
                 return reply.strip()
@@ -947,38 +951,177 @@ async def revise_recommendation(req: PlanRevisionRequest):
 
 
 if HAS_MULTIPART:
+    import base64
     from fastapi import UploadFile, File
 
     @app.post("/api/transcribe", response_model=TranscriptionResponse)
     async def transcribe(file: UploadFile = File(...)):
-        if not file.content_type or not file.content_type.startswith("audio/"):
+        ct = (file.content_type or "").lower()
+        fn = (file.filename or "").lower()
+        is_audio = (
+            ct.startswith("audio/")
+            or ct.startswith("video/webm")
+            or any(fn.endswith(ext) for ext in [".webm", ".wav", ".mp3", ".m4a", ".mp4", ".ogg", ".aac", ".flac"])
+        )
+        if not is_audio:
             raise HTTPException(status_code=400, detail="Please upload a valid audio file.")
 
         audio_bytes = await file.read()
-        if not audio_bytes:
-            raise HTTPException(status_code=400, detail="Uploaded audio file is empty.")
+        if not audio_bytes or len(audio_bytes) < 32:
+            raise HTTPException(status_code=400, detail="Uploaded audio file is empty or too short.")
 
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        if not api_key:
-            raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured for audio transcription.")
+        gemini_key = settings.GEMINI_API_KEY
+        groq_key = settings.GROQ_API_KEY
+        openai_key = settings.OPENAI_API_KEY
 
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=api_key)
-            audio_buffer = io.BytesIO(audio_bytes)
-            audio_buffer.name = file.filename or "audio.webm"
-
-            result = client.audio.transcriptions.create(
-                model="gpt-4o-mini-transcribe",
-                file=audio_buffer,
+        if not gemini_key and not groq_key and not openai_key:
+            raise HTTPException(
+                status_code=503,
+                detail="Audio transcription is not configured on the server. Please set GEMINI_API_KEY, GROQ_API_KEY or OPENAI_API_KEY.",
             )
-            transcript = (result.text or "").strip()
-            if not transcript:
-                raise ValueError("Empty transcription")
-            return TranscriptionResponse(transcript=transcript)
-        except Exception as e:
-            print(f"Audio transcription failed: {e}")
-            raise HTTPException(status_code=500, detail="Audio transcription failed. Please try again.")
+
+        clean_mime = ct.split(";")[0] if ct.startswith("audio/") else "audio/webm"
+
+        # 1. Try Groq Whisper. It leads because it answers in a couple of
+        # seconds on a free tier, while a rate-limited or out-of-credit key
+        # ahead of it burns its whole retry backoff first.
+        if groq_key:
+            try:
+                groq_resp = requests.post(
+                    f"{settings.GROQ_BASE_URL.rstrip('/')}/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    files={"file": (file.filename or "voice-input.webm", audio_bytes, clean_mime)},
+                    data={"model": settings.GROQ_TRANSCRIBE_MODEL, "temperature": "0"},
+                    timeout=45,
+                )
+                if groq_resp.status_code == 200:
+                    transcript = str((groq_resp.json() or {}).get("text") or "").strip()
+                    return TranscriptionResponse(transcript=transcript)
+                if groq_resp.status_code == 429 and not (gemini_key or openai_key):
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Transcription services are rate limiting requests. Please wait a moment.",
+                    )
+                print(f"[Groq Transcription] HTTP {groq_resp.status_code}: {groq_resp.text[:300]}")
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"[Groq Transcription] Failed: {type(e).__name__}: {e}")
+                if not (gemini_key or openai_key):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Groq transcription failed: {e}",
+                    )
+
+        # 2. Try Google Gemini Multimodal Audio Transcription
+        if gemini_key:
+            try:
+                b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+                gemini_model = settings.GEMINI_MODEL
+
+                payload = {
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "mimeType": clean_mime,
+                                        "data": b64_audio,
+                                    }
+                                },
+                                {
+                                    "text": (
+                                        "Transcribe the spoken speech in this audio clip verbatim. "
+                                        "If no clear speech is detected, return an empty response. "
+                                        "Return ONLY the transcribed text with no extra commentary, "
+                                        "conversational remarks, markdown formatting, or quotes."
+                                    )
+                                },
+                            ],
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.0,
+                    },
+                }
+
+                resp = None
+                for attempt in range(3):
+                    try:
+                        resp = requests.post(
+                            f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent",
+                            params={"key": gemini_key},
+                            json=payload,
+                            timeout=45,
+                        )
+                        if resp.status_code == 200:
+                            break
+                        if resp.status_code in (429, 503) and attempt < 2:
+                            import time
+                            time.sleep(1.2 * (attempt + 1))
+                            continue
+                    except requests.RequestException:
+                        if attempt < 2:
+                            import time
+                            time.sleep(1.0 * (attempt + 1))
+                            continue
+
+                if resp is not None and resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = (candidates[0].get("content") or {}).get("parts") or []
+                        transcript = "".join(part.get("text", "") for part in parts if isinstance(part, dict)).strip()
+                        return TranscriptionResponse(transcript=transcript)
+                    return TranscriptionResponse(transcript="")
+                elif resp is not None and resp.status_code == 429:
+                    if not (groq_key or openai_key):
+                        raise HTTPException(status_code=429, detail="Gemini transcription rate limit exceeded. Please wait a moment.")
+                else:
+                    if resp is not None:
+                        print(f"[Gemini Transcription] HTTP {resp.status_code}: {resp.text}")
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"[Gemini Transcription] Failed: {e}")
+                if not (groq_key or openai_key):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Gemini transcription failed: {e}",
+                    )
+
+        # 3. Try OpenAI Whisper Transcription
+        if openai_key:
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=openai_key)
+                audio_buffer = io.BytesIO(audio_bytes)
+                audio_buffer.name = file.filename or "audio.webm"
+
+                result = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_buffer,
+                )
+                transcript = (result.text or "").strip()
+                return TranscriptionResponse(transcript=transcript)
+            except Exception as e:
+                print(f"OpenAI transcription failed: {type(e).__name__}: {e}")
+                err_str = str(e).lower()
+                if "insufficient_quota" in err_str or "credit_balance_exhausted" in err_str:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Voice input is unavailable — the transcription provider has no credits left.",
+                    )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Audio transcription failed ({type(e).__name__}): {e}",
+                )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to transcribe audio with configured providers.",
+        )
 else:
     @app.post("/api/transcribe", response_model=TranscriptionResponse)
     async def transcribe_unavailable():
@@ -1069,7 +1212,7 @@ Suggest 3-4 specific indoor or weather-safe alternative activities they can do i
 Keep the suggestions aligned with their '{req.mood}' vibe if possible.
 Return a simple JSON list of strings under the key 'alternatives'."""
 
-    from backend.app.providers.ai.factory import AIProviderFactory, BaseLLMProvider
+    from backend.app.providers.ai.factory import AIProviderFactory
 
     for provider_name in AIProviderFactory.provider_chain():
         try:

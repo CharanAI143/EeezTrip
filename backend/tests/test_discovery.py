@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.app.schemas.discovery import MoodRequest, SeasonalRequest
+from backend.app.schemas.discovery import MoodRequest, SeasonalRequest, VoiceExtractRequest
 from backend.app.services.discovery_service import DiscoveryService
 
 client = TestClient(app)
@@ -102,6 +102,34 @@ def test_mood_recommendations_unknown_mood_falls_back_to_relaxed():
     unknown = service.mood_recommendations(MoodRequest(mood="underwater-basketweaving"))
     relaxed = service.mood_recommendations(MoodRequest(mood="relaxed"))
     assert [i.name for i in unknown] == [i.name for i in relaxed]
+
+
+def test_voice_extract_normalises_currency_from_provider(monkeypatch):
+    """A model asked for a currency may answer in words, not an ISO code."""
+    service = DiscoveryService()
+    monkeypatch.setattr(service, "_ask", lambda prompt, timeout: {
+        "destination": "Manali", "currency": "rupees", "budget": 30000, "duration": 5,
+    })
+
+    result = service.voice_extract(
+        VoiceExtractRequest(transcript="plan a trip to Manali for 5 days")
+    )
+
+    assert result.currency == "INR"
+
+
+def test_voice_extract_drops_unmappable_currency(monkeypatch):
+    """An unusable currency is worse than none: the form would show it raw."""
+    service = DiscoveryService()
+    monkeypatch.setattr(service, "_ask", lambda prompt, timeout: {
+        "destination": "Manali", "currency": "credits",
+    })
+
+    result = service.voice_extract(
+        VoiceExtractRequest(transcript="plan a trip to Manali")
+    )
+
+    assert result.currency != "credits"
 
 
 def test_mood_recommendations_endpoint():

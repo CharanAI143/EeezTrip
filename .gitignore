@@ -12,3 +12,8 @@ coverage/
 
 __pycache__/
 *.pyc
+
+# Local Python environments for backend/requirements.txt. Without these the
+# venv would show up as thousands of untracked files and risk being committed.
+venv/
+.venv/

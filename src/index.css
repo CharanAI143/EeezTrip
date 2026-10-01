@@ -438,6 +438,234 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb { background: var(--ice-300); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ice-400); }
 
+/* Referenced by the chat panel and the quick-prompt strip, but never actually
+   defined, so it was a dead class and both scrollers showed a track. */
+.scrollbar-hide {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* legacy Edge */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Landing Page — layout, section chrome, Kanchenjunga backdrop
+   ═══════════════════════════════════════════════════════ */
+
+/* The page-level scroll value lives here, set once by the shell. Anything that
+   wants to react to reading progress reads --lp-progress rather than adding its
+   own scroll listener. */
+.lp-page {
+  position: relative;
+  min-height: 100vh;
+  --lp-progress: 0;
+}
+
+/* Alternating band, used by both the how-it-works and features sections. */
+.lp-section-alt {
+  padding: 80px 24px;
+  background: linear-gradient(180deg, transparent, rgba(224,242,254,0.4), transparent);
+  position: relative;
+  z-index: 1;
+}
+
+.lp-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 60px;
+  align-items: center;
+}
+
+.lp-cta-banner {
+  background: linear-gradient(135deg, #075985 0%, #0ea5e9 50%, #ec4899 100%);
+  border-radius: 32px;
+  padding: clamp(50px, 8vw, 80px) 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.lp-cta-glow {
+  position: absolute;
+  top: -50%;
+  right: -15%;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  filter: blur(40px);
+}
+
+/* ── Kanchenjunga backdrop ──
+   Sits between the hero gradient and the hero content. Fixed to the hero's box
+   rather than the viewport, so it belongs to the hero instead of following the
+   reader down the rest of the page. */
+.kanchenjunga {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 78%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* JS sets translate3d from the shared scroll progress; the transition is
+     what keeps that from stepping once per scroll event. */
+  transition: transform 0.4s linear;
+  will-change: transform;
+}
+
+.kanchenjunga-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Each ridge drifts horizontally at its own rate and period. Because the speeds
+   differ, the layers separate and re-converge instead of sliding as one block. */
+.kanchenjunga .kj-layer {
+  animation: kj-drift 44s ease-in-out infinite alternate;
+}
+.kanchenjunga .kj-layer-mid {
+  animation-duration: 32s;
+  animation-direction: alternate-reverse;
+}
+.kanchenjunga .kj-layer-near {
+  animation-duration: 20s;
+}
+
+/* Snowfields breathe rather than move — a travelling offset would read as the
+   snow sliding down the mountain. */
+.kanchenjunga .kj-snow {
+  animation: kj-snow-breathe 9s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.kanchenjunga .kj-snow-2 {
+  animation-duration: 13s;
+  animation-delay: -4s;
+}
+
+/* Striations pulse very gently so the texture is alive without ever reading
+   as a moving landscape. */
+.kanchenjunga .kj-striae {
+  animation: kj-snow-breathe 11s ease-in-out infinite;
+}
+.kanchenjunga .kj-striae-shadow {
+  animation-duration: 15s;
+  animation-delay: -6s;
+}
+
+.kanchenjunga .kj-sky {
+  animation: kj-sky-shift 26s ease-in-out infinite alternate;
+}
+
+.kj-mist {
+  position: absolute;
+  left: -30%;
+  width: 160%;
+  height: 40%;
+  border-radius: 50%;
+  filter: blur(28px);
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 70%);
+  animation: kj-mist-drift 30s linear infinite;
+}
+.kj-mist-1 { bottom: 12%; opacity: 0.7; }
+.kj-mist-2 { bottom: 26%; opacity: 0.4; animation-duration: 44s; animation-delay: -15s; }
+
+@keyframes kj-drift {
+  0%   { transform: translate3d(-14px, 0, 0); }
+  100% { transform: translate3d(14px, 0, 0); }
+}
+
+@keyframes kj-snow-breathe {
+  0%, 100% { opacity: 0.86; }
+  50%      { opacity: 1; }
+}
+
+@keyframes kj-sky-shift {
+  0%   { opacity: 0.85; }
+  100% { opacity: 1; }
+}
+
+@keyframes kj-mist-drift {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(16%); }
+}
+
+/* Reduced motion: the global guard already collapses durations, but the drift
+   and mist are long and continuous, so they are stopped outright rather than
+   left jittering at 0.001ms. */
+.kanchenjunga[data-still='true'] .kj-layer,
+.kanchenjunga[data-still='true'] .kj-snow,
+.kanchenjunga[data-still='true'] .kj-sky,
+.kanchenjunga[data-still='true'] .kj-striae,
+.kanchenjunga[data-still='true'] .kj-mist {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanchenjunga .kj-layer,
+  .kanchenjunga .kj-snow,
+  .kanchenjunga .kj-sky,
+  .kanchenjunga .kj-striae,
+  .kanchenjunga .kj-mist {
+    animation: none;
+  }
+  .kanchenjunga { transition: none; }
+}
+
+/* ── Snowfall ──
+   Page-wide, fixed, so it keeps falling over every section as the reader
+   scrolls. Below the navbar/chat (z-100 / z-200) and above the section content
+   (z-1), so navigation and CTAs stay crisp while the weather reads in front of
+   the scenery. */
+.snowfall {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.snowfall-flake {
+  position: absolute;
+  top: -6vh;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #e8f6ff 55%, #cbeafc 100%);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.55);
+  will-change: transform, opacity;
+}
+
+/* The fall and the flutter are two offsets on the same transform, so a flake
+   drops while weaving. The S-path comes from the drift reversing between the
+   keyframes. */
+@keyframes snow-drift {
+  0%   { transform: translate3d(calc(var(--fl-drift) * -0.5), -6vh, 0); }
+  25%  { transform: translate3d(calc(var(--fl-drift) * 0.6), 22vh, 0); }
+  50%  { transform: translate3d(calc(var(--fl-drift) * -0.35), 50vh, 0); }
+  75%  { transform: translate3d(calc(var(--fl-drift) * 0.5), 78vh, 0); }
+  100% { transform: translate3d(calc(var(--fl-drift) * -0.4), 112vh, 0); }
+}
+
+.snowfall-flake {
+  animation: snow-drift var(--fl-fall) linear var(--fl-delay) infinite;
+}
+
+.snowfall[data-still='true'] .snowfall-flake {
+  animation: none;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snowfall-flake {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* ── Utility ── */
 .container {
   max-width: 1200px;
@@ -524,7 +752,14 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* An explicit resting transform gives the engine a defined start value to
+     interpolate from, instead of animating away from `none`. */
+  transform: rotateY(0deg);
+  /* Snappy but not abrupt: 0.45s clears the edge-on midpoint before it reads as
+     a stall, and the symmetric ease keeps the entry and exit equally weighted
+     so the card turns rather than snapping then drifting. */
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
 }
 .img-card[data-flipped='true'] .img-card-inner {
   transform: rotateY(180deg);
@@ -764,21 +999,57 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Floating Grid Composition ── */
+/* Two layers on purpose. A running CSS animation beats a plain `transform`
+   declaration in the cascade, so the float used to wipe out both the card's
+   resting tilt and its :hover scale, flattening the fanned composition into a
+   plain vertical stack. The slot owns the drift, the card inside owns the
+   tilt and the hover, so the two compose instead of overwriting. */
 .hero-floating-grid {
   position: relative;
   width: 100%;
-  height: 500px;
+  height: 520px;
   perspective: 1000px;
 }
 
-.hero-card {
+.hero-card-slot {
   position: absolute;
+  /* Drift only. Any rotate() here would be discarded while the animation
+     runs, which is the bug this split exists to prevent. */
+  animation: hero-drift 9s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-card-slot-1 { width: 280px; height: 380px; top: 0;   right: 15%; z-index: 2; animation-duration: 9s; }
+.hero-card-slot-2 { width: 220px; height: 280px; bottom: 20px; left: 0; z-index: 3; animation-duration: 7s;  animation-delay: -2.5s; }
+.hero-card-slot-3 { width: 200px; height: 240px; top: 40px; right: 0;  z-index: 1; animation-duration: 11s; animation-delay: -5s; }
+
+@keyframes hero-drift {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  25%      { transform: translateY(-16px) translateX(5px); }
+  50%      { transform: translateY(-4px)  translateX(-4px); }
+  75%      { transform: translateY(-20px) translateX(2px); }
+}
+
+.hero-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 24px;
   overflow: hidden;
+  background: #fff;
   box-shadow: 0 24px 50px rgba(12, 27, 51, 0.2);
   border: 6px solid #fff;
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Slow, symmetric ease so the drift never looks like it stutters at the
+     turnaround points. */
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.45s ease;
+  transform: rotate(var(--hero-tilt, 0deg));
 }
+.hero-card:hover {
+  transform: rotate(0deg) scale(1.06);
+  box-shadow: 0 34px 70px rgba(12, 27, 51, 0.28);
+  z-index: 10;
+}
+.hero-card-slot-3 .hero-card { opacity: 0.92; }
+.hero-card-slot-3 .hero-card:hover { opacity: 1; }
 
 .hero-card img {
   width: 100%;
@@ -787,38 +1058,15 @@ h1, h2, h3, h4, h5, h6 {
   display: block;
 }
 
-.hero-card-1 {
-  width: 280px;
-  height: 380px;
-  top: 0;
-  right: 15%;
-  z-index: 2;
-  transform: rotate(3deg);
+/* Replays on every destination swap because the img is keyed by name. */
+@keyframes hero-swap-in {
+  0%   { opacity: 0; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
 }
-.hero-card-1:hover { transform: rotate(0deg) scale(1.05); z-index: 10; }
-
-.hero-card-2 {
-  width: 220px;
-  height: 280px;
-  bottom: 20px;
-  left: 0;
-  z-index: 3;
-  transform: rotate(-5deg);
+.hero-card-swap {
+  animation: hero-swap-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.hero-card-2:hover { transform: rotate(0deg) scale(1.05); z-index: 10; }
 
-.hero-card-3 {
-  width: 200px;
-  height: 240px;
-  top: 40px;
-  right: 0;
-  z-index: 1;
-  transform: rotate(8deg);
-  opacity: 0.9;
-}
-.hero-card-3:hover { transform: rotate(0deg) scale(1.05); z-index: 10; opacity: 1; }
-
-/* ── Responsive ── */
 @media (max-width: 768px) {
   .container, .container-narrow { padding: 0 16px; }
 }

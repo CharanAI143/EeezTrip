@@ -146,6 +146,29 @@ def _as_text(value: Any, fallback: str = "") -> str:
     return fallback
 
 
+_CURRENCY_ALIASES = {
+    "rupee": "INR", "rupees": "INR", "inr": "INR", "rs": "INR", "₹": "INR",
+    "dollar": "USD", "dollars": "USD", "usd": "USD", "$": "USD", "buck": "USD",
+    "euro": "EUR", "euros": "EUR", "eur": "EUR", "€": "EUR",
+    "pound": "GBP", "pounds": "GBP", "gbp": "GBP", "£": "GBP",
+    "yen": "JPY", "jpy": "JPY", "¥": "JPY",
+    "dirham": "AED", "dirhams": "AED", "aed": "AED",
+    "aud": "AUD", "cad": "CAD", "sgd": "SGD",
+}
+
+
+def _normalise_currency(value: Optional[str]) -> Optional[str]:
+    """Map a spoken or model-written currency onto an ISO code, or drop it.
+
+    Anything unrecognised is discarded rather than passed through: the form
+    selects from a fixed list, so an unmapped value is worse than no value,
+    which leaves the field on its default.
+    """
+    if not value:
+        return None
+    return _CURRENCY_ALIASES.get(value.strip().lower().rstrip("."))
+
+
 class DiscoveryService:
     """Destination-discovery helpers shared by the v1 routes."""
 
@@ -276,10 +299,16 @@ class DiscoveryService:
         payload = self._ask(self._voice_prompt(req), max(10, settings.DEEP_MODE_TIMEOUT_SEC * 2))
         merged = self._regex_extraction(req.transcript)
         if isinstance(payload, dict):
-            for field in ("startLocation", "destination", "currency"):
+            for field in ("startLocation", "destination"):
                 value = _as_text(payload.get(field))
                 if value:
                     merged[field] = value
+            # Only accept a currency the form can actually use. A model asked for
+            # a currency will happily answer "rupees", which the ISO-typed field
+            # then carried through as an unusable value.
+            currency = _normalise_currency(_as_text(payload.get("currency")))
+            if currency:
+                merged["currency"] = currency
             budget = _as_int(payload.get("budget"), 0)
             if budget:
                 merged["budget"] = budget

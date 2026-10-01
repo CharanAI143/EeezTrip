@@ -141,38 +141,155 @@ export async function getSeasonalRecommendations(userLocation: string): Promise<
   return empty;
 }
 
-const VENUE_HINTS = [
-  /\b(?:from|starting|leaving|origin|departing from)\s+([a-z][a-z\s]{2,30}?)(?=\s+(?:to|for|,|\.|with|$))/i,
-  /\b(?:visit|go|going|travel|trip|plan|fly)\s+(?:to\s+)?([a-z][a-z\s]{2,30}?)(?=\s+(?:for|with|from|,|\.|$))/i,
+const START_HINTS = [
+  /\b(?:from|starting\s+(?:from|at)|leaving\s+(?:from)?|originating\s+(?:from|at)?|departing\s+(?:from)?|out\s+of)\s+([a-zA-Z][a-zA-Z\s]{1,30}?)(?=\s+(?:to|for|with|in|on|under|around|budget|,|\.|$))/i,
+  /\b([a-zA-Z][a-zA-Z\s]{1,24}?)\s+to\s+([a-zA-Z][a-zA-Z\s]{1,24}?)(?=\s+(?:for|with|in|under|around|budget|,|\.|$))/i,
 ];
 
-const BUDGET_HINT = /(?:budget|for|under|around|rs\.?|inr|₹|\$)\s*([\d][\d,]{2,})/i;
-const DURATION_HINT = /(\d{1,2})\s*(?:day|days|night|nights)/i;
+const DEST_HINTS = [
+  /\b(?:to\s+(?!visit\b|go\b|going\b|travel\b|head\b|fly\b|plan\b|trip\b))([a-zA-Z][a-zA-Z\s]{1,30}?)(?=\s+(?:from|for|with|in|on|under|around|budget|,|\.|$))/i,
+  /\b(?:visit|visiting|go\s+to|going\s+to|travel\s+to|trip\s+to|fly\s+to|flying\s+to|head\s+to|explore)\s+([a-zA-Z][a-zA-Z\s]{1,30}?)(?=\s+(?:from|for|with|in|on|under|around|budget|,|\.|$))/i,
+];
+
+const BUDGET_HINT = /(?:budget(?:\s+is|\s+of|\s*:)?|under|around|approx(?:imately)?|rs\.?|inr|₹|\$|€|£)\s*([\d][\d,]{2,})/i;
+const BUDGET_REVERSE_HINT = /([\d][\d,]{2,})\s*(?:budget|rupees?|rs\.?|inr|₹|\$|dollars?|bucks|euros?|€|pounds?|£)/i;
+const DURATION_DAYS_HINT = /(\d{1,2})\s*(?:day|days|night|nights)/i;
+const DURATION_WEEKS_HINT = /(\d{1,2})\s*(?:week|weeks)/i;
+
+const PREF_KEYWORDS: Record<string, string> = {
+  beach: 'beaches',
+  beaches: 'beaches',
+  mountain: 'mountains',
+  mountains: 'mountains',
+  food: 'food',
+  foodie: 'food',
+  culture: 'culture',
+  cultural: 'culture',
+  nightlife: 'nightlife',
+  party: 'nightlife',
+  nature: 'nature',
+  shopping: 'shopping',
+  history: 'history',
+  historical: 'history',
+};
+
+const TRIP_TYPE_KEYWORDS: Record<string, string> = {
+  leisure: 'leisure',
+  relax: 'leisure',
+  relaxed: 'leisure',
+  adventure: 'adventure',
+  adventurous: 'adventure',
+  romantic: 'romantic',
+  honeymoon: 'romantic',
+  business: 'business',
+  work: 'business',
+  family: 'family',
+  kids: 'family',
+  solo: 'solo',
+  alone: 'solo',
+  backpacking: 'backpacking',
+  budget: 'backpacking',
+};
+
+function titleCase(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
 
 /** Pull what we can out of a free-form transcript with regexes. */
 function regexExtraction(text: string): ExtractedTripData {
   const data: ExtractedTripData = {};
+  if (!text || !text.trim()) return data;
 
-  for (const pattern of VENUE_HINTS) {
-    const match = text.match(pattern);
+  const cleanText = text.trim();
+
+  // Try extracting start location
+  for (const pattern of START_HINTS) {
+    const match = cleanText.match(pattern);
     if (match?.[1]) {
-      const value = match[1].trim().replace(/\b\w/g, (c) => c.toUpperCase());
-      if (pattern === VENUE_HINTS[0]) data.startLocation = value;
-      else data.destination = value;
-      break;
+      const candidate = match[1].trim();
+      if (!/^(?:visit|go|travel|trip|plan|fly)$/i.test(candidate)) {
+        data.startLocation = titleCase(candidate);
+        if (match[2] && !data.destination) {
+          data.destination = titleCase(match[2].trim());
+        }
+        break;
+      }
     }
   }
 
-  const budget = text.match(BUDGET_HINT);
-  if (budget?.[1]) data.budget = Number(budget[1].replace(/[^\d]/g, ''));
+  // Try extracting destination if not already found
+  if (!data.destination) {
+    for (const pattern of DEST_HINTS) {
+      const match = cleanText.match(pattern);
+      if (match?.[1]) {
+        const candidate = match[1].trim();
+        if (candidate.toLowerCase() !== data.startLocation?.toLowerCase()) {
+          data.destination = titleCase(candidate);
+          break;
+        }
+      }
+    }
+  }
 
-  const duration = text.match(DURATION_HINT);
-  if (duration?.[1]) data.duration = Number(duration[1]);
+  // Budget
+  const budgetMatch = cleanText.match(BUDGET_HINT) || cleanText.match(BUDGET_REVERSE_HINT);
+  if (budgetMatch?.[1]) {
+    const parsedBudget = Number(budgetMatch[1].replace(/[^\d]/g, ''));
+    if (!Number.isNaN(parsedBudget) && parsedBudget > 0) {
+      data.budget = parsedBudget;
+    }
+  }
 
-  if (/\b(inr|rs\.?|rupees|₹)\b/i.test(text)) data.currency = 'INR';
-  else if (/\b(usd|\$|dollars?)\b/i.test(text)) data.currency = 'USD';
-  else if (/\b(eur|€)\b/i.test(text)) data.currency = 'EUR';
-  else if (/\b(gbp|£)\b/i.test(text)) data.currency = 'GBP';
+  // Duration
+  const daysMatch = cleanText.match(DURATION_DAYS_HINT);
+  if (daysMatch?.[1]) {
+    data.duration = Number(daysMatch[1]);
+  } else {
+    const weeksMatch = cleanText.match(DURATION_WEEKS_HINT);
+    if (weeksMatch?.[1]) {
+      data.duration = Number(weeksMatch[1]) * 7;
+    }
+  }
+
+  // Currency
+  if (/\b(inr|rs\.?|rupees?|₹)\b/i.test(cleanText)) data.currency = 'INR';
+  else if (/\b(usd|\$|dollars?|bucks)\b/i.test(cleanText)) data.currency = 'USD';
+  else if (/\b(eur|€|euros?)\b/i.test(cleanText)) data.currency = 'EUR';
+  else if (/\b(gbp|£|pounds?)\b/i.test(cleanText)) data.currency = 'GBP';
+  else if (/\b(aed|dirhams?)\b/i.test(cleanText)) data.currency = 'AED';
+  else if (/\b(cad|canadian dollars?)\b/i.test(cleanText)) data.currency = 'CAD';
+  else if (/\b(aud|australian dollars?)\b/i.test(cleanText)) data.currency = 'AUD';
+  else if (/\b(jpy|yen|¥)\b/i.test(cleanText)) data.currency = 'JPY';
+  else if (/\b(sgd|singapore dollars?)\b/i.test(cleanText)) data.currency = 'SGD';
+
+  // Preferences
+  const foundPrefs = new Set<string>();
+  for (const [kw, pref] of Object.entries(PREF_KEYWORDS)) {
+    const reg = new RegExp(`\\b${kw}\\b`, 'i');
+    if (reg.test(cleanText)) {
+      foundPrefs.add(pref);
+    }
+  }
+  if (foundPrefs.size > 0) {
+    data.preferences = Array.from(foundPrefs);
+  }
+
+  // Trip Types
+  const foundTypes = new Set<string>();
+  for (const [kw, type] of Object.entries(TRIP_TYPE_KEYWORDS)) {
+    const reg = new RegExp(`\\b${kw}\\b`, 'i');
+    if (reg.test(cleanText)) {
+      foundTypes.add(type);
+    }
+  }
+  if (foundTypes.size > 0) {
+    data.tripTypes = Array.from(foundTypes);
+  }
 
   return data;
 }

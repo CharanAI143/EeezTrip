@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -10,6 +11,15 @@ from backend.app.providers.ai.base import BaseAIProvider
 
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
+# Gemini answers an over-quota key with 429 too, so the status code alone cannot
+# tell "wait a moment" from "this key is done". Only the body can.
+_QUOTA_MARKERS = ("quota", "billing", "exceeded your current")
+
+
+def _is_quota_exhausted(body: str) -> bool:
+    lowered = (body or "").lower()
+    return any(marker in lowered for marker in _QUOTA_MARKERS)
+
 
 class BaseLLMProvider(BaseAIProvider):
     """Shared HTTP/LLM plumbing: timeout, JSON recovery, and error normalisation."""
@@ -20,7 +30,7 @@ class BaseLLMProvider(BaseAIProvider):
         return max(5, settings.AI_REQUEST_TIMEOUT_SEC)
 
     def generate_structured_json(self, prompt: str, schema: Dict[str, Any]) -> Dict[str, Any]:
-        raw = self.generate_text(prompt)
+        raw = self.generate_text(prompt, json_mode=True)
         if not raw:
             raise ValueError(f"{self.name} returned an empty response")
         return self.parse_json_object(raw)
@@ -66,30 +76,54 @@ class GeminiProvider(BaseLLMProvider):
     def is_available(self) -> bool:
         return bool(settings.GEMINI_API_KEY)
 
-    def generate_text(self, prompt: str, system_instruction: str = "") -> str:
+    def generate_text(
+        self, prompt: str, system_instruction: str = "", json_mode: bool = True
+    ) -> str:
         if not self.is_available():
             raise RuntimeError("GEMINI_API_KEY is not configured")
 
+        generation_config: Dict[str, Any] = {"temperature": settings.AI_TEMPERATURE}
+        if json_mode:
+            generation_config["responseMimeType"] = "application/json"
+
         payload: Dict[str, Any] = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": settings.AI_TEMPERATURE,
-                "responseMimeType": "application/json",
-            },
+            "generationConfig": generation_config,
         }
         if system_instruction:
             payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
 
-        response = requests.post(
-            f"{self._BASE_URL}/{settings.GEMINI_MODEL}:generateContent",
-            params={"key": settings.GEMINI_API_KEY},
-            json=payload,
-            timeout=self._timeout(),
-        )
-        if response.status_code == 429:
-            raise RuntimeError("Gemini rate limit exceeded")
-        if response.status_code >= 400:
-            raise RuntimeError(f"Gemini request failed with status {response.status_code}")
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(
+                    f"{self._BASE_URL}/{settings.GEMINI_MODEL}:generateContent",
+                    params={"key": settings.GEMINI_API_KEY},
+                    json=payload,
+                    timeout=self._timeout(),
+                )
+                if response.status_code == 200:
+                    break
+                # An exhausted quota is a billing state, not a transient blip.
+                # Retrying it three times only adds seconds to every request in
+                # the chain before the fallback gets its turn.
+                if response.status_code == 429 and _is_quota_exhausted(response.text):
+                    raise RuntimeError("Gemini quota exhausted")
+                if response.status_code in (429, 503) and attempt < 2:
+                    time.sleep(1.2 * (attempt + 1))
+                    continue
+                if response.status_code == 429:
+                    raise RuntimeError("Gemini rate limit exceeded")
+                if response.status_code >= 400:
+                    raise RuntimeError(f"Gemini request failed with status {response.status_code}")
+            except requests.RequestException as req_err:
+                if attempt < 2:
+                    time.sleep(1.0 * (attempt + 1))
+                    continue
+                raise RuntimeError(f"Gemini network error: {req_err}")
+
+        if response is None or response.status_code != 200:
+            raise RuntimeError("Gemini did not return a successful response")
 
         data = response.json()
         candidates = data.get("candidates") or []
@@ -100,7 +134,7 @@ class GeminiProvider(BaseLLMProvider):
             raise RuntimeError("Gemini returned no candidates")
 
         parts = (candidates[0].get("content") or {}).get("parts") or []
-        text = "".join(part.get("text", "") for part in parts).strip()
+        text = "".join(part.get("text", "") for part in parts if isinstance(part, dict)).strip()
         if not text:
             raise RuntimeError("Gemini returned an empty completion")
         return text
@@ -151,7 +185,9 @@ class OllamaProvider(BaseLLMProvider):
         self._probe_cache[self._base_url] = (now, model)
         return model
 
-    def generate_text(self, prompt: str, system_instruction: str = "") -> str:
+    def generate_text(
+        self, prompt: str, system_instruction: str = "", json_mode: bool = True
+    ) -> str:
         if not self.is_available():
             raise RuntimeError("No Ollama model is available locally")
 
@@ -160,15 +196,18 @@ class OllamaProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system_instruction})
         messages.append({"role": "user", "content": prompt})
 
+        body: Dict[str, Any] = {
+            "model": self._resolved_model() or settings.OLLAMA_MODEL,
+            "messages": messages,
+            "stream": False,
+            "options": {"temperature": settings.AI_TEMPERATURE},
+        }
+        if json_mode:
+            body["format"] = "json"
+
         response = requests.post(
             f"{self._base_url}/api/chat",
-            json={
-                "model": self._resolved_model() or settings.OLLAMA_MODEL,
-                "messages": messages,
-                "format": "json",
-                "stream": False,
-                "options": {"temperature": settings.AI_TEMPERATURE},
-            },
+            json=body,
             timeout=self._timeout(),
         )
         if response.status_code >= 400:
@@ -178,6 +217,91 @@ class OllamaProvider(BaseLLMProvider):
         if not content:
             raise RuntimeError("Ollama returned an empty completion")
         return content
+
+
+class OpenAICompatibleProvider(BaseLLMProvider):
+    """Any server exposing the OpenAI ``/chat/completions`` contract.
+
+    Covers Groq, Cerebras, Together, Fireworks, or a self-hosted vLLM by
+    pointing the base URL at it. Subclasses only supply credentials.
+    """
+
+    name = "openai-compatible"
+
+    _base_url = ""
+    _api_key = ""
+    _model = ""
+
+    def is_available(self) -> bool:
+        return bool(self._api_key and self._base_url and self._model)
+
+    def generate_text(
+        self, prompt: str, system_instruction: str = "", json_mode: bool = True
+    ) -> str:
+        if not self.is_available():
+            raise RuntimeError(f"{self.name} is not configured")
+
+        messages: List[Dict[str, str]] = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        endpoint = f"{self._base_url.rstrip('/')}/chat/completions"
+        body: Dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "temperature": settings.AI_TEMPERATURE,
+        }
+        if json_mode:
+            # Mirrors the other providers so parse_json_object sees JSON
+            # directly. Providers that reject this field fall through to the
+            # next one in the chain.
+            body["response_format"] = {"type": "json_object"}
+
+        response = requests.post(
+            endpoint,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+            timeout=self._timeout(),
+        )
+        if response.status_code == 429:
+            raise RuntimeError(f"{self.name} rate limit exceeded")
+        if response.status_code >= 400:
+            raise RuntimeError(f"{self.name} request failed with status {response.status_code}")
+
+        choices = (response.json() or {}).get("choices") or []
+        if not choices:
+            raise RuntimeError(f"{self.name} returned no choices")
+
+        content = ((choices[0].get("message") or {}).get("content") or "").strip()
+        if not content:
+            raise RuntimeError(f"{self.name} returned an empty completion")
+        return content
+
+
+class GroqProvider(OpenAICompatibleProvider):
+    """Groq preset — set GROQ_API_KEY alone and the fallback comes online."""
+
+    name = "groq"
+
+    def __init__(self) -> None:
+        self._base_url = settings.GROQ_BASE_URL
+        self._api_key = settings.GROQ_API_KEY
+        self._model = settings.GROQ_MODEL
+
+
+class GenericOpenAICompatibleProvider(OpenAICompatibleProvider):
+    """Vendor-neutral OpenAI-compatible slot, configured purely by env vars."""
+
+    name = "openai-compatible"
+
+    def __init__(self) -> None:
+        self._base_url = settings.OPENAI_COMPATIBLE_BASE_URL
+        self._api_key = settings.OPENAI_COMPATIBLE_API_KEY
+        self._model = settings.OPENAI_COMPATIBLE_MODEL
 
 
 class OpenRouterProvider(BaseLLMProvider):
@@ -190,7 +314,9 @@ class OpenRouterProvider(BaseLLMProvider):
     def is_available(self) -> bool:
         return bool(settings.OPENROUTER_API_KEY)
 
-    def generate_text(self, prompt: str, system_instruction: str = "") -> str:
+    def generate_text(
+        self, prompt: str, system_instruction: str = "", json_mode: bool = True
+    ) -> str:
         if not self.is_available():
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
 
@@ -236,7 +362,9 @@ class UnavailableProvider(BaseLLMProvider):
     def is_available(self) -> bool:
         return False
 
-    def generate_text(self, prompt: str, system_instruction: str = "") -> str:
+    def generate_text(
+        self, prompt: str, system_instruction: str = "", json_mode: bool = True
+    ) -> str:
         raise RuntimeError("No AI provider is configured")
 
 
@@ -245,8 +373,10 @@ class AIProviderFactory:
 
     _providers: Dict[str, Type[BaseAIProvider]] = {
         "gemini": GeminiProvider,
-        "ollama": OllamaProvider,
+        "groq": GroqProvider,
+        "openai-compatible": GenericOpenAICompatibleProvider,
         "openrouter": OpenRouterProvider,
+        "ollama": OllamaProvider,
     }
 
     @classmethod
@@ -257,8 +387,22 @@ class AIProviderFactory:
 
     @classmethod
     def provider_chain(cls, preferred: Optional[List[str]] = None) -> List[str]:
-        """Return provider names in fallback order, de-duplicated and availability-filtered."""
-        chain = list(preferred or ["gemini", "openrouter", "ollama"])
+        """Return provider names in fallback order, de-duplicated and availability-filtered.
+
+        Groq leads because its free tier answers in seconds, while an exhausted
+        or rate-limited key ahead of it burns its full retry backoff on every
+        single request before the chain moves on. Hosted providers still come
+        before the local Ollama slot, so a running local model is only reached
+        when no cloud provider is usable.
+
+        Set ``AI_PROVIDER_CHAIN`` to reorder this, e.g. to put Gemini first
+        again once its quota is topped up.
+        """
+        chain = list(
+            preferred
+            or [name.strip().lower() for name in os.getenv("AI_PROVIDER_CHAIN", "").split(",") if name.strip()]
+            or ["groq", "gemini", "openai-compatible", "openrouter", "ollama"]
+        )
         seen: List[str] = []
         for name in chain:
             normalised = (name or "").strip().lower()

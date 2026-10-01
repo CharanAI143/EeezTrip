@@ -127,22 +127,96 @@ export async function fetchChatReply(
   }
 }
 
+/**
+ * The backend forwards raw provider errors, so a transcription failure can look
+ * like: `Audio transcription failed (RateLimitError): Error code: 429 - {...}`.
+ * That is unreadable in a chat bubble and often names the wrong culprit, so the
+ * known cases are mapped to something the user can act on.
+ */
+function humanizeTranscribeError(detail: string): string {
+  const text = detail.toLowerCase();
+  if (text.includes('insufficient_quota') || text.includes('credit_balance_exhausted') || text.includes('no credits remaining')) {
+    return 'Voice input is unavailable right now — the transcription service has no credits left. Please try again later.';
+  }
+  if (text.includes('rate limit') || text.includes('429')) {
+    return 'The transcription service is rate limiting requests. Please wait a moment and try again.';
+  }
+  if (text.includes('api key') || text.includes('authentication') || text.includes('401')) {
+    return 'The transcription service rejected its credentials. Please check the server API key.';
+  }
+  if (text.includes('not configured')) {
+    return 'Voice input is not configured on the server.';
+  }
+  if (text.includes('valid audio') || text.includes('empty')) {
+    return 'That recording was too short or in an unsupported format.';
+  }
+  // Unknown provider noise: keep the leading clause only, it names the cause.
+  const firstClause = detail.split(/[({]/)[0].trim();
+  return firstClause.length > 0 && firstClause.length < 120
+    ? firstClause
+    : 'Voice input could not be processed.';
+}
+
+/**
+ * MediaRecorder picks the container per browser (Chrome records webm, Safari
+ * records mp4). The transcription providers choose their decoder from the
+ * uploaded filename extension, so a hardcoded .webm would hand Whisper mp4
+ * bytes and fail. Derive the extension from the real blob type instead.
+ */
+const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
+  'audio/webm': 'webm',
+  'video/webm': 'webm',
+  'audio/mp4': 'mp4',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/aac': 'aac',
+  'audio/flac': 'flac',
+  'audio/m4a': 'm4a',
+};
+
+function audioFilename(blob: Blob): string {
+  // Strip codec parameters, e.g. 'audio/webm;codecs=opus'.
+  const mime = (blob.type || '').split(';')[0].trim().toLowerCase();
+  return `voice-input.${AUDIO_EXTENSION_BY_MIME[mime] ?? 'webm'}`;
+}
+
 export async function transcribeAudio(
   audioBlob: Blob,
   signal?: AbortSignal,
 ): Promise<string> {
   const formData = new FormData();
-  formData.append('file', audioBlob, 'voice-input.webm');
+  formData.append('file', audioBlob, audioFilename(audioBlob));
 
-  const res = await fetch(`${BASE}/transcribe`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/transcribe`, {
+      method: 'POST',
+      body: formData,
+      signal,
+    });
+  } catch (e: any) {
+    // A dev-server proxy that cannot reach the API answers with an empty
+    // text/plain body, so the old `err.detail || fallback` path reported
+    // "unable to transcribe" for what is really an unreachable backend.
+    if (e?.name === 'AbortError' || signal?.aborted) throw e;
+    throw new Error(`Cannot reach the transcription API at ${BASE} — is the backend running?`);
+  }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Unable to transcribe audio right now.');
+    const body = await res.text();
+    let detail: unknown;
+    try {
+      detail = JSON.parse(body)?.detail;
+    } catch {
+      detail = body;
+    }
+    // FastAPI validation errors arrive as an array of objects; only a scalar
+    // detail is worth putting in front of a user.
+    const reason = typeof detail === 'string' ? detail.trim() : '';
+    throw new Error(reason ? humanizeTranscribeError(reason) : `Transcription failed (HTTP ${res.status})`);
   }
 
   const data = await res.json();

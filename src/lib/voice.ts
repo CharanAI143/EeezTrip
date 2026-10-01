@@ -4,84 +4,243 @@ export interface VoiceAssistantResult {
   isFinal: boolean;
 }
 
+export type VoiceAssistantErrorHandler = (error: string) => void;
+
 export class VoiceAssistant {
-  private recognition: any;
-  private synthesis: SpeechSynthesis;
-  private isListening: boolean = false;
+  private recognition: any = null;
+  private synthesis: SpeechSynthesis | null = null;
+  private isListeningState: boolean = false;
+  private currentUtterance: SpeechSynthesisUtterance | null = null;
 
   constructor() {
-    this.synthesis = window.speechSynthesis;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
-    if (SpeechRecognition) {
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = false;
-      this.recognition.interimResults = true;
-      this.recognition.lang = 'en-US';
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      this.synthesis = window.speechSynthesis;
+    } else if (typeof globalThis !== 'undefined' && 'speechSynthesis' in globalThis) {
+      this.synthesis = (globalThis as any).speechSynthesis;
     }
   }
 
-  public startListening(onResult: (result: VoiceAssistantResult) => void, onEnd: () => void) {
-    if (!this.recognition || this.isListening) return;
+  public isSupported(): boolean {
+    if (typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) {
+      return true;
+    }
+    if (typeof globalThis !== 'undefined' && ((globalThis as any).SpeechRecognition || (globalThis as any).webkitSpeechRecognition)) {
+      return true;
+    }
+    return false;
+  }
 
-    this.isListening = true;
-    this.recognition.onresult = (event: any) => {
-      const result = event.results[event.results.length - 1];
-      onResult({
-        transcript: result[0].transcript,
-        isFinal: result.isFinal
-      });
-    };
+  public isSpeechSynthesisSupported(): boolean {
+    return (
+      (typeof window !== 'undefined' && 'speechSynthesis' in window) ||
+      (typeof globalThis !== 'undefined' && 'speechSynthesis' in globalThis)
+    );
+  }
 
-    this.recognition.onend = () => {
-      this.isListening = false;
+  public get isListening(): boolean {
+    return this.isListeningState;
+  }
+
+  public startListening(
+    onResult: (result: VoiceAssistantResult) => void,
+    onEnd: () => void,
+    onError?: VoiceAssistantErrorHandler
+  ) {
+    if (!this.isSupported()) {
+      onError?.('Speech recognition is not supported in this browser.');
       onEnd();
-    };
+      return;
+    }
 
-    this.recognition.onerror = (event: any) => {
-      console.error('Speech recognition error', event.error);
-      this.isListening = false;
+    // If currently running, abort previous session before starting new one
+    if (this.recognition) {
+      try {
+        this.recognition.abort();
+      } catch {
+        // ignore
+      }
+      this.recognition = null;
+    }
+
+    const SpeechRecognitionClass =
+      (typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) ||
+      (typeof globalThis !== 'undefined' && ((globalThis as any).SpeechRecognition || (globalThis as any).webkitSpeechRecognition));
+
+    try {
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      this.recognition = recognition;
+      this.isListeningState = true;
+
+      recognition.onresult = (event: any) => {
+        let fullTranscript = '';
+        let isFinal = false;
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res && res[0]) {
+            fullTranscript += res[0].transcript;
+          }
+          if (res && (res.isFinal || res[0]?.isFinal)) {
+            isFinal = true;
+          }
+        }
+
+        onResult({
+          transcript: fullTranscript.trim(),
+          isFinal: isFinal,
+        });
+      };
+
+      recognition.onend = () => {
+        this.isListeningState = false;
+        this.recognition = null;
+        onEnd();
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        this.isListeningState = false;
+        this.recognition = null;
+
+        let errorMessage = 'Microphone or speech recognition error occurred.';
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          errorMessage = 'Microphone access was denied. Please allow microphone permissions in your browser.';
+        } else if (event.error === 'no-speech') {
+          errorMessage = 'No speech was detected. Please try speaking closer to the microphone.';
+        } else if (event.error === 'audio-capture') {
+          errorMessage = 'No microphone was found or microphone is not working.';
+        } else if (event.error === 'network') {
+          errorMessage = 'Speech recognition network error. Please check your connection.';
+        } else if (event.error === 'aborted') {
+          // Normal abort when user stops
+          onEnd();
+          return;
+        }
+
+        onError?.(errorMessage);
+        onEnd();
+      };
+
+      recognition.start();
+    } catch (err: any) {
+      console.error('Failed to initialize speech recognition:', err);
+      this.isListeningState = false;
+      this.recognition = null;
+      onError?.(err?.message || 'Failed to start microphone.');
       onEnd();
-    };
-
-    this.recognition.start();
+    }
   }
 
   public stopListening() {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
-      this.isListening = false;
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+      } catch {
+        // ignore
+      }
+      this.isListeningState = false;
+    }
+  }
+
+  public abortListening() {
+    if (this.recognition) {
+      try {
+        this.recognition.abort();
+      } catch {
+        // ignore
+      }
+      this.recognition = null;
+      this.isListeningState = false;
     }
   }
 
   public speak(text: string, onEnd?: () => void) {
-    // Cancel any ongoing speech
-    this.synthesis.cancel();
+    const synth =
+      (typeof window !== 'undefined' && window.speechSynthesis)
+        ? window.speechSynthesis
+        : (typeof globalThis !== 'undefined' && (globalThis as any).speechSynthesis)
+          ? (globalThis as any).speechSynthesis
+          : this.synthesis;
 
-    // Clean markdown or special chars for better speech
-    const cleanText = text
-      .replace(/[*_#~]/g, '')
-      .replace(/\[.*?\]\(.*?\)/g, '')
-      .slice(0, 300); // Limit length for speed
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    
-    if (onEnd) {
-      utterance.onend = onEnd;
+    if (!synth) {
+      onEnd?.();
+      return;
     }
 
-    this.synthesis.speak(utterance);
+    try {
+      synth.cancel();
+
+      // Clean markdown or special chars for better speech clarity
+      const cleanText = text
+        .replace(/[*_#~`]/g, '')
+        .replace(/\[.*?\]\(.*?\)/g, '')
+        .slice(0, 400);
+
+      if (!cleanText.trim()) {
+        onEnd?.();
+        return;
+      }
+
+      const SpeechUtteranceClass =
+        (typeof window !== 'undefined' && (window as any).SpeechSynthesisUtterance) ||
+        (typeof globalThis !== 'undefined' && (globalThis as any).SpeechSynthesisUtterance);
+
+      if (!SpeechUtteranceClass) {
+        onEnd?.();
+        return;
+      }
+
+      const utterance = new SpeechUtteranceClass(cleanText);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+
+      // Keep reference to avoid browser garbage collection bug
+      this.currentUtterance = utterance;
+
+      utterance.onend = () => {
+        this.currentUtterance = null;
+        onEnd?.();
+      };
+
+      utterance.onerror = (err: any) => {
+        console.warn('Speech synthesis utterance error:', err);
+        this.currentUtterance = null;
+        onEnd?.();
+      };
+
+      if (synth.paused) {
+        synth.resume();
+      }
+
+      synth.speak(utterance);
+    } catch (e) {
+      console.warn('Speech synthesis failed:', e);
+      this.currentUtterance = null;
+      onEnd?.();
+    }
   }
 
   public stopSpeaking() {
-    this.synthesis.cancel();
-  }
+    const synth =
+      this.synthesis ||
+      (typeof window !== 'undefined' ? window.speechSynthesis : null) ||
+      (typeof globalThis !== 'undefined' ? (globalThis as any).speechSynthesis : null);
 
-  public isSupported() {
-    return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (synth) {
+      try {
+        synth.cancel();
+      } catch {
+        // ignore
+      }
+    }
+    this.currentUtterance = null;
   }
 }
 
 export const voiceAssistant = new VoiceAssistant();
+

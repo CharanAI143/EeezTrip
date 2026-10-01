@@ -44,11 +44,12 @@ class AIOrchestrator:
         )
 
         # Deep mode gets a longer budget for reasoning; normal mode stays snappy.
-        timeout = (
-            settings.AI_REQUEST_TIMEOUT_SEC
-            if req.mode == "deep"
-            else max(10, settings.DEEP_MODE_TIMEOUT_SEC * 4)
-        )
+        # DEEP_MODE_TIMEOUT_SEC is the deep-mode budget, so it is scaled past the
+        # normal single-call timeout to keep deep > normal.
+        if req.mode == "deep":
+            timeout = max(10, settings.DEEP_MODE_TIMEOUT_SEC * 4)
+        else:
+            timeout = settings.AI_REQUEST_TIMEOUT_SEC
 
         response, provider_name = self._try_providers(prompt, timeout)
         if response is not None:

@@ -98,7 +98,12 @@ class IntentEngine:
                 if not provider.is_available():
                     continue
                 # Provider calls are blocking HTTP, so keep them off the event loop.
-                reply = await asyncio.to_thread(provider.generate_text, prompt, _SYSTEM_INSTRUCTION)
+                # The reply is shown to the traveller verbatim, so JSON mode must be
+                # off: OpenAI-compatible endpoints reject response_format when the
+                # messages never mention JSON.
+                reply = await asyncio.to_thread(
+                    provider.generate_text, prompt, _SYSTEM_INSTRUCTION, False
+                )
                 if reply and reply.strip():
                     return ConciergeResponse(
                         reply=reply.strip(),

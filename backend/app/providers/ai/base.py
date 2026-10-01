@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 class BaseAIProvider(ABC):
     """Abstract Base Interface for AI Provider implementations."""
@@ -10,8 +10,14 @@ class BaseAIProvider(ABC):
         pass
 
     @abstractmethod
-    def generate_text(self, prompt: str, system_instruction: str = "") -> str:
-        """Generate unstructured text response from prompt."""
+    def generate_text(
+        self, prompt: str, system_instruction: str = "", json_mode: bool = True
+    ) -> str:
+        """Generate unstructured text response from prompt.
+
+        ``json_mode`` asks the provider for a JSON object. It must be off for
+        conversational chat, where the reply is shown verbatim.
+        """
         pass
 
     @abstractmethod
