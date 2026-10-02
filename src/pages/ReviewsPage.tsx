@@ -300,7 +300,7 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
               style={getPanelStyle(hoveredIndex)}
-              className="absolute bg-gradient-to-br from-black/3 via-black/5 to-black/10 backdrop-blur-sm rounded-2xl p-5 overflow-auto z-30 border border-brand-border/20 shadow-2xl pointer-events-auto"
+              className="absolute bg-white/75 backdrop-blur-xl rounded-2xl p-5 overflow-auto z-30 border border-brand-border/30 shadow-2xl pointer-events-auto"
               onMouseEnter={() => {
                 const dest = popularDestinations[hoveredIndex!];
                 if (!expandedReviews[dest.id]?.length && !loadingReviews[dest.id]) {
