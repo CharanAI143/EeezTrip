@@ -26,9 +26,77 @@ const PAGE_PROGRESS: Record<Page, number> = {
   auth: 0,
 };
 
-const PLANE_SVG = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2A1 1 0 0 0 4 6.1l1.7 4.2A2 2 0 0 0 7.4 11.5l2.3.8-2 3.5a1 1 0 0 0 .2 1.2l1.4 1.4a1 1 0 0 0 1.2.2l3.5-2 .8 2.3a2 2 0 0 0 1.3 1.3l4.2 1.7a1 1 0 0 0 .9-.8z"/>
+const ET_PLANE_LOGO = (
+  <svg width="40" height="40" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="et-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#0ea5e9" />
+        <stop offset="50%" stopColor="#38bdf8" />
+        <stop offset="100%" stopColor="#06b6d4" />
+      </linearGradient>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+        <feMerge>
+          <feMergeNode in="coloredBlur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    {/* Fuselage - forms the E */}
+    <g filter="url(#glow)">
+      <path
+        d="M18 16 L18 48 L24 48 L24 16 Z"
+        fill="url(#et-gradient)"
+        stroke="url(#et-gradient)"
+        strokeWidth="1.5"
+      />
+      {/* E middle bar */}
+      <rect x="18" y="30" width="12" height="3" rx="1.5" fill="url(#et-gradient)" />
+      {/* E top bar */}
+      <rect x="18" y="18" width="10" height="2.5" rx="1.25" fill="url(#et-gradient)" />
+      {/* E bottom bar */}
+      <rect x="18" y="43" width="11" height="2.5" rx="1.25" fill="url(#et-gradient)" />
+    </g>
+    {/* Wings - form the T */}
+    <g filter="url(#glow)">
+      {/* Horizontal wing bar - top of T */}
+      <path
+        d="M10 28 L38 28"
+        stroke="url(#et-gradient)"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+      />
+      {/* Vertical tail - stem of T */}
+      <path
+        d="M24 28 L24 40"
+        stroke="url(#et-gradient)"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+      />
+      {/* Small tail fin */}
+      <path
+        d="M24 40 L20 45 L24 45 Z"
+        fill="url(#et-gradient)"
+      />
+    </g>
+    {/* Motion lines for animation */}
+    <g opacity="0.4" stroke="url(#et-gradient)" strokeWidth="1.5" strokeLinecap="round">
+      <line x1="8" y1="30" x2="2" y2="32" className="motion-line" />
+      <line x1="6" y1="34" x2="0" y2="36" className="motion-line" />
+      <line x1="5" y1="38" x2="-1" y2="40" className="motion-line" />
+    </g>
+    <style>{`
+      @keyframes fly-motion {
+        0% { transform: translateX(0); opacity: 0.4; }
+        50% { transform: translateX(-4px); opacity: 0.6; }
+        100% { transform: translateX(0); opacity: 0.4; }
+      }
+      .motion-line {
+        animation: fly-motion 1.5s ease-in-out infinite;
+      }
+      .motion-line:nth-child(2) { animation-delay: 0.2s; }
+      .motion-line:nth-child(3) { animation-delay: 0.4s; }
+    `}</style>
   </svg>
 );
 
@@ -117,7 +185,7 @@ export default function Navbar() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 10,
             background: 'none',
             border: 'none',
             cursor: 'pointer',
@@ -126,18 +194,7 @@ export default function Navbar() {
             minHeight: 44,
           }}
         >
-          <span style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)',
-            color: '#fff',
-          }}>
-            {PLANE_SVG}
-          </span>
+          {ET_PLANE_LOGO}
           <span style={{
             fontFamily: 'Outfit, sans-serif',
             fontWeight: 800,
