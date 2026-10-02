@@ -410,7 +410,6 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
                         </div>
                       ) : (
                         <div className="text-center py-6 text-brand-muted text-sm space-y-2">
-                          <p>Reviews load when you hover</p>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
