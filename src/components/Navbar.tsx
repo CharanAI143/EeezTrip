@@ -1,6 +1,6 @@
 import { useTripStore } from '../state/tripStore';
 import { Page } from '../types';
-import { useState, useLayoutEffect, useRef, useEffect } from 'react';
+import { useState, useLayoutEffect, useRef } from 'react';
 import { signOut, auth } from '../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -26,145 +26,223 @@ const PAGE_PROGRESS: Record<Page, number> = {
   auth: 0,
 };
 
-// Animated E+T Airplane Logo Component
+// Animated E+T Airplane Logo Component - E and T revolve, clump, form plane with pink T at tail
 function ETPlaneLogo() {
-  const [isAssembled, setIsAssembled] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsAssembled(true), 600);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <svg width="56" height="56" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="56" height="56" viewBox="0 0 1200 500" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="et-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        {/* Blue gradient for airplane parts */}
+        <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#0ea5e9" />
           <stop offset="50%" stopColor="#38bdf8" />
           <stop offset="100%" stopColor="#06b6d4" />
         </linearGradient>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-          <feMerge>
-            <feMergeNode in="coloredBlur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
+        {/* Pink gradient for T at tail */}
+        <linearGradient id="pink-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ec4899" />
+          <stop offset="50%" stopColor="#f472b6" />
+          <stop offset="100%" stopColor="#f9a8d4" />
+        </linearGradient>
       </defs>
 
-      {/* === LETTER E - becomes wings + forepart === */}
+      {/* =================================
+           PHASE 1: E and T revolve around each other
+      ================================== */}
+      {/* Letter E - starts left, orbits to center */}
       <motion.g
-        filter="url(#glow)"
-        initial={{ opacity: 1, x: -60, y: 20, scale: 0.8, rotate: -15 }}
-        animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
-        transition={{ duration: 1.2, delay: 0.1, ease: [0.34, 1.56, 0.64, 1] }}
-        style={{ transformOrigin: 'center center' }}
+        initial={{ opacity: 1, x: -400, y: 0, scale: 1.2, rotate: 0 }}
+        animate={{
+          x: [ -400, -150, -50, 0, 0 ],
+          y: [ 0, -100, 50, -30, 0 ],
+          scale: [ 1.2, 1.3, 1.1, 1, 1 ],
+          rotate: [ 0, -180, -360, -720, 0 ],
+          opacity: [ 1, 1, 1, 1, 1 ]
+        }}
+        transition={{ duration: 3.2, ease: [0.4, 0, 0.2, 1] }}
+        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
       >
-        {/* E vertical spine - becomes front fuselage */}
-        <motion.rect
-          x="28" y="20" width="8" height="60" rx="4"
-          fill="url(#et-gradient)"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
-        />
-        {/* E top bar - becomes left wing */}
-        <motion.rect
-          x="28" y="20" width="35" height="6" rx="3"
-          fill="url(#et-gradient)"
-          initial={{ x: 60, y: -20, scaleX: 0.3, rotate: -45, opacity: 0 }}
-          animate={{ x: 0, y: 0, scaleX: 1, rotate: 0, opacity: 1 }}
-          transition={{ duration: 1, delay: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
-        />
-        {/* E middle bar - becomes right wing */}
-        <motion.rect
-          x="28" y="47" width="35" height="6" rx="3"
-          fill="url(#et-gradient)"
-          initial={{ x: 60, y: 40, scaleX: 0.3, rotate: 45, opacity: 0 }}
-          animate={{ x: 0, y: 0, scaleX: 1, rotate: 0, opacity: 1 }}
-          transition={{ duration: 1, delay: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-        />
-        {/* E bottom bar - becomes fuselage bottom */}
-        <motion.rect
-          x="28" y="74" width="28" height="5" rx="2.5"
-          fill="url(#et-gradient)"
-          initial={{ x: 50, y: 50, scaleX: 0.2, opacity: 0 }}
-          animate={{ x: 0, y: 0, scaleX: 1, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.6, ease: 'easeOut' }}
-        />
+        <text
+          x="150"
+          y="290"
+          font-size="190"
+          font-weight="900"
+          fill="url(#blue-gradient)"
+          font-family="Arial, Helvetica, sans-serif"
+          text-anchor="middle"
+          dominant-baseline="middle"
+        >
+          E
+        </text>
       </motion.g>
 
-      {/* === LETTER T - becomes tail section === */}
+      {/* Letter T - starts right, orbits to center */}
       <motion.g
-        filter="url(#glow)"
-        initial={{ opacity: 1, x: 60, y: -20, scale: 0.8, rotate: 15 }}
-        animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
-        transition={{ duration: 1.2, delay: 0.15, ease: [0.34, 1.56, 0.64, 1] }}
-        style={{ transformOrigin: 'center center' }}
+        initial={{ opacity: 1, x: 400, y: 0, scale: 1.2, rotate: 0 }}
+        animate={{
+          x: [ 400, 150, 50, 0, 0 ],
+          y: [ 0, 100, -50, 30, 0 ],
+          scale: [ 1.2, 1.3, 1.1, 1, 1 ],
+          rotate: [ 0, 180, 360, 720, 0 ],
+          opacity: [ 1, 1, 1, 1, 1 ]
+        }}
+        transition={{ duration: 3.2, ease: [0.4, 0, 0.2, 1] }}
+        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
       >
-        {/* T horizontal - becomes horizontal stabilizer (tail wings) */}
-        <motion.rect
-          x="56" y="28" width="40" height="5" rx="2.5"
-          fill="url(#et-gradient)"
-          initial={{ x: -40, scaleX: 0, opacity: 0 }}
-          animate={{ x: 0, scaleX: 1, opacity: 1 }}
-          transition={{ duration: 0.9, delay: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-        />
-        {/* T vertical - becomes vertical stabilizer (tail fin) */}
-        <motion.rect
-          x="74" y="28" width="6" height="40" rx="3"
-          fill="url(#et-gradient)"
-          initial={{ y: -40, scaleY: 0, opacity: 0 }}
-          animate={{ y: 0, scaleY: 1, opacity: 1 }}
-          transition={{ duration: 0.9, delay: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-        />
-        {/* Tail fin tip */}
+        <text
+          x="930"
+          y="290"
+          font-size="190"
+          font-weight="900"
+          fill="url(#blue-gradient)"
+          font-family="Arial, Helvetica, sans-serif"
+          text-anchor="middle"
+          dominant-baseline="middle"
+        >
+          T
+        </text>
+      </motion.g>
+
+      {/* =================================
+           PHASE 2: Clump together in center (letters overlap)
+      ================================== */}
+      <motion.g
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: [0, 0, 0, 1, 1], scale: [0.5, 0.5, 0.5, 1.2, 1] }}
+        transition={{ duration: 0.8, delay: 3.0, ease: [0.34, 1.56, 0.64, 1] }}
+        style={{ transformOrigin: 'center' }}
+      >
+        <text
+          x="540"
+          y="290"
+          font-size="200"
+          font-weight="900"
+          fill="url(#blue-gradient)"
+          font-family="Arial, Helvetica, sans-serif"
+          text-anchor="middle"
+          dominant-baseline="middle"
+        >
+          ET
+        </text>
+      </motion.g>
+
+      {/* =================================
+           PHASE 3: Transform into airplane
+      ================================== */}
+      <g className="airplane">
+        {/* Main airplane body - from E's vertical stroke */}
         <motion.path
-          d="M96 68 L100 78 L92 78 Z"
-          fill="url(#et-gradient)"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 1.0, ease: [0.34, 1.56, 0.64, 1] }}
+          className="airplane"
+          fill="url(#blue-gradient)"
+          d="
+            M 230 245
+            C 270 205, 330 190, 400 195
+            L 720 220
+            C 790 225, 855 225, 930 215
+            L 985 205
+            L 985 295
+            L 930 285
+            C 855 275, 790 275, 720 280
+            L 400 305
+            C 330 310, 270 295, 230 255
+            Z
+          "
+          initial={{ opacity: 0, scaleX: 0, transformOrigin: 'left center' }}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={{ duration: 1.4, delay: 3.8, ease: 'easeOut' }}
         />
-      </motion.g>
 
-      {/* === Engine glow / motion particles === */}
-      <motion.g opacity={0.3} filter="url(#glow)">
-        <motion.circle
-          cx="14" cy="50" r="3"
-          fill="url(#et-gradient)"
-          initial={{ opacity: 0, r: 0 }}
-          animate={{ opacity: [0, 1, 0], r: [1, 4, 2] }}
-          transition={{ duration: 1.5, repeat: Infinity, delay: 1.2, ease: 'easeInOut' }}
+        {/* Upper wing - from E's top bar */}
+        <motion.path
+          className="airplane"
+          fill="url(#blue-gradient)"
+          d="
+            M 475 210
+            L 650 55
+            C 665 42, 690 42, 710 43
+            L 625 220
+            Z
+          "
+          initial={{ opacity: 0, scale: 0.05, transformOrigin: 'left center' }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.2, delay: 3.9, ease: [0.22, 1, 0.36, 1] }}
         />
-        <motion.circle
-          cx="10" cy="54" r="2"
-          fill="url(#et-gradient)"
-          initial={{ opacity: 0, r: 0 }}
-          animate={{ opacity: [0, 1, 0], r: [1, 3, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity, delay: 1.4, ease: 'easeInOut' }}
-        />
-        <motion.circle
-          cx="6" cy="58" r="2"
-          fill="url(#et-gradient)"
-          initial={{ opacity: 0, r: 0 }}
-          animate={{ opacity: [0, 1, 0], r: [1, 3, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity, delay: 1.6, ease: 'easeInOut' }}
-        />
-      </motion.g>
 
-      {/* === Continuous subtle motion when assembled === */}
-      {isAssembled && (
-        <motion.g filter="url(#glow)">
-          {/* Gentle bobbing motion */}
-          <motion.g
-            animate={{ y: [0, -3, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        {/* Lower wing - from E's middle bar */}
+        <motion.path
+          className="airplane"
+          fill="url(#blue-gradient)"
+          d="
+            M 470 290
+            L 650 445
+            C 665 458, 690 458, 710 457
+            L 625 280
+            Z
+          "
+          initial={{ opacity: 0, scale: 0.05, transformOrigin: 'left center' }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.2, delay: 4.0, ease: [0.22, 1, 0.36, 1] }}
+        />
+
+        {/* =================================
+             TAIL - formed from T (PINK!)
+        ================================== */}
+        {/* Tail horizontal stabilizer - from T's horizontal bar */}
+        <motion.path
+          className="airplane"
+          fill="url(#pink-gradient)"
+          d="
+            M 900 220
+            L 985 145
+            C 995 136, 1010 135, 1030 136
+            L 1010 220
+            L 1010 280
+            L 1030 365
+            C 1010 366, 995 365, 995 356
+            L 900 280
+            Z
+          "
+          initial={{ opacity: 0, scale: 0.05, rotate: -15, transformOrigin: 'center' }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ duration: 1.1, delay: 3.7, ease: [0.22, 1, 0.36, 1] }}
+        />
+
+        {/* Vertical tail fin - from T's vertical stem */}
+        <motion.path
+          className="airplane"
+          fill="url(#pink-gradient)"
+          d="
+            M 1000 220
+            L 1020 220
+            L 1020 140
+            L 1000 140
+            Z
+          "
+          initial={{ opacity: 0, scaleY: 0, transformOrigin: 'bottom center' }}
+          animate={{ opacity: 1, scaleY: 1 }}
+          transition={{ duration: 0.8, delay: 3.9, ease: [0.22, 1, 0.36, 1] }}
+        />
+
+        {/* Pink T letter at the tail - THE KEY REQUIREMENT */}
+        <motion.g
+          initial={{ opacity: 0, scale: 0.3, rotate: -90 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ duration: 0.6, delay: 4.2, ease: [0.34, 1.56, 0.64, 1] }}
+          style={{ transformOrigin: 'center' }}
+        >
+          <text
+            x="1010"
+            y="190"
+            font-size="50"
+            font-weight="900"
+            fill="url(#pink-gradient)"
+            font-family="Arial, Helvetica, sans-serif"
+            text-anchor="middle"
+            dominant-baseline="middle"
           >
-            {/* Re-apply the assembled shapes for continuous animation */}
-          </motion.g>
+            T
+          </text>
         </motion.g>
-      )}
+      </g>
     </svg>
   );
 }
