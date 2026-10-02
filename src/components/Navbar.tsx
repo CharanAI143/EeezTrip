@@ -26,226 +26,11 @@ const PAGE_PROGRESS: Record<Page, number> = {
   auth: 0,
 };
 
-// Animated E+T Airplane Logo Component - E and T revolve, clump, form plane with pink T at tail
-function ETPlaneLogo() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 1200 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        {/* Blue gradient for airplane parts */}
-        <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0ea5e9" />
-          <stop offset="50%" stopColor="#38bdf8" />
-          <stop offset="100%" stopColor="#06b6d4" />
-        </linearGradient>
-        {/* Pink gradient for T at tail */}
-        <linearGradient id="pink-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ec4899" />
-          <stop offset="50%" stopColor="#f472b6" />
-          <stop offset="100%" stopColor="#f9a8d4" />
-        </linearGradient>
-      </defs>
-
-      {/* =================================
-           PHASE 1: E and T revolve around each other
-      ================================== */}
-      {/* Letter E - starts left, orbits to center */}
-      <motion.g
-        initial={{ opacity: 1, x: -400, y: 0, scale: 1.2, rotate: 0 }}
-        animate={{
-          x: [ -400, -150, -50, 0, 0 ],
-          y: [ 0, -100, 50, -30, 0 ],
-          scale: [ 1.2, 1.3, 1.1, 1, 1 ],
-          rotate: [ 0, -180, -360, -720, 0 ],
-          opacity: [ 1, 1, 1, 1, 1 ]
-        }}
-        transition={{ duration: 3.2, ease: [0.4, 0, 0.2, 1] }}
-        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
-      >
-        <text
-          x="150"
-          y="290"
-          font-size="190"
-          font-weight="900"
-          fill="url(#blue-gradient)"
-          font-family="Arial, Helvetica, sans-serif"
-          text-anchor="middle"
-          dominant-baseline="middle"
-        >
-          E
-        </text>
-      </motion.g>
-
-      {/* Letter T - starts right, orbits to center */}
-      <motion.g
-        initial={{ opacity: 1, x: 400, y: 0, scale: 1.2, rotate: 0 }}
-        animate={{
-          x: [ 400, 150, 50, 0, 0 ],
-          y: [ 0, 100, -50, 30, 0 ],
-          scale: [ 1.2, 1.3, 1.1, 1, 1 ],
-          rotate: [ 0, 180, 360, 720, 0 ],
-          opacity: [ 1, 1, 1, 1, 1 ]
-        }}
-        transition={{ duration: 3.2, ease: [0.4, 0, 0.2, 1] }}
-        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
-      >
-        <text
-          x="930"
-          y="290"
-          font-size="190"
-          font-weight="900"
-          fill="url(#blue-gradient)"
-          font-family="Arial, Helvetica, sans-serif"
-          text-anchor="middle"
-          dominant-baseline="middle"
-        >
-          T
-        </text>
-      </motion.g>
-
-      {/* =================================
-           PHASE 2: Clump together in center (letters overlap)
-      ================================== */}
-      <motion.g
-        initial={{ opacity: 0, scale: 0.5 }}
-        animate={{ opacity: [0, 0, 0, 1, 1], scale: [0.5, 0.5, 0.5, 1.2, 1] }}
-        transition={{ duration: 0.8, delay: 3.0, ease: [0.34, 1.56, 0.64, 1] }}
-        style={{ transformOrigin: 'center' }}
-      >
-        <text
-          x="540"
-          y="290"
-          font-size="200"
-          font-weight="900"
-          fill="url(#blue-gradient)"
-          font-family="Arial, Helvetica, sans-serif"
-          text-anchor="middle"
-          dominant-baseline="middle"
-        >
-          ET
-        </text>
-      </motion.g>
-
-      {/* =================================
-           PHASE 3: Transform into airplane
-      ================================== */}
-      <g className="airplane">
-        {/* Main airplane body - from E's vertical stroke */}
-        <motion.path
-          className="airplane"
-          fill="url(#blue-gradient)"
-          d="
-            M 230 245
-            C 270 205, 330 190, 400 195
-            L 720 220
-            C 790 225, 855 225, 930 215
-            L 985 205
-            L 985 295
-            L 930 285
-            C 855 275, 790 275, 720 280
-            L 400 305
-            C 330 310, 270 295, 230 255
-            Z
-          "
-          initial={{ opacity: 0, scaleX: 0, transformOrigin: 'left center' }}
-          animate={{ opacity: 1, scaleX: 1 }}
-          transition={{ duration: 1.4, delay: 3.8, ease: 'easeOut' }}
-        />
-
-        {/* Upper wing - from E's top bar */}
-        <motion.path
-          className="airplane"
-          fill="url(#blue-gradient)"
-          d="
-            M 475 210
-            L 650 55
-            C 665 42, 690 42, 710 43
-            L 625 220
-            Z
-          "
-          initial={{ opacity: 0, scale: 0.05, transformOrigin: 'left center' }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.2, delay: 3.9, ease: [0.22, 1, 0.36, 1] }}
-        />
-
-        {/* Lower wing - from E's middle bar */}
-        <motion.path
-          className="airplane"
-          fill="url(#blue-gradient)"
-          d="
-            M 470 290
-            L 650 445
-            C 665 458, 690 458, 710 457
-            L 625 280
-            Z
-          "
-          initial={{ opacity: 0, scale: 0.05, transformOrigin: 'left center' }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.2, delay: 4.0, ease: [0.22, 1, 0.36, 1] }}
-        />
-
-        {/* =================================
-             TAIL - formed from T (PINK!)
-        ================================== */}
-        {/* Tail horizontal stabilizer - from T's horizontal bar */}
-        <motion.path
-          className="airplane"
-          fill="url(#pink-gradient)"
-          d="
-            M 900 220
-            L 985 145
-            C 995 136, 1010 135, 1030 136
-            L 1010 220
-            L 1010 280
-            L 1030 365
-            C 1010 366, 995 365, 995 356
-            L 900 280
-            Z
-          "
-          initial={{ opacity: 0, scale: 0.05, rotate: -15, transformOrigin: 'center' }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-          transition={{ duration: 1.1, delay: 3.7, ease: [0.22, 1, 0.36, 1] }}
-        />
-
-        {/* Vertical tail fin - from T's vertical stem */}
-        <motion.path
-          className="airplane"
-          fill="url(#pink-gradient)"
-          d="
-            M 1000 220
-            L 1020 220
-            L 1020 140
-            L 1000 140
-            Z
-          "
-          initial={{ opacity: 0, scaleY: 0, transformOrigin: 'bottom center' }}
-          animate={{ opacity: 1, scaleY: 1 }}
-          transition={{ duration: 0.8, delay: 3.9, ease: [0.22, 1, 0.36, 1] }}
-        />
-
-        {/* Pink T letter at the tail - THE KEY REQUIREMENT */}
-        <motion.g
-          initial={{ opacity: 0, scale: 0.3, rotate: -90 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-          transition={{ duration: 0.6, delay: 4.2, ease: [0.34, 1.56, 0.64, 1] }}
-          style={{ transformOrigin: 'center' }}
-        >
-          <text
-            x="1010"
-            y="190"
-            font-size="50"
-            font-weight="900"
-            fill="url(#pink-gradient)"
-            font-family="Arial, Helvetica, sans-serif"
-            text-anchor="middle"
-            dominant-baseline="middle"
-          >
-            T
-          </text>
-        </motion.g>
-      </g>
-    </svg>
-  );
-}
+const PLANE_SVG = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2A1 1 0 0 0 4 6.1l1.7 4.2A2 2 0 0 0 7.4 11.5l2.3.8-2 3.5a1 1 0 0 0 .2 1.2l1.4 1.4a1 1 0 0 0 1.2.2l3.5-2 .8 2.3a2 2 0 0 0 1.3 1.3l4.2 1.7a1 1 0 0 0 .9-.8z"/>
+  </svg>
+);
 
 export default function Navbar() {
   const { state, navigate } = useTripStore();
@@ -332,7 +117,7 @@ export default function Navbar() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 8,
             background: 'none',
             border: 'none',
             cursor: 'pointer',
@@ -341,7 +126,18 @@ export default function Navbar() {
             minHeight: 44,
           }}
         >
-          <ETPlaneLogo />
+          <span style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 34,
+            height: 34,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)',
+            color: '#fff',
+          }}>
+            {PLANE_SVG}
+          </span>
           <span style={{
             fontFamily: 'Outfit, sans-serif',
             fontWeight: 800,
