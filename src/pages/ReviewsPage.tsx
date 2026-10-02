@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import { motion } from 'motion/react';
-import { Loader2, User as UserIcon, Star, Sparkles, WifiOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Loader2, User as UserIcon, Star, Sparkles, WifiOff, MapPin, Heart } from 'lucide-react';
 import { ReviewDestinations } from '../components/ReviewDestinations';
 import { useTripStore } from '../state/tripStore';
 import { fetchExternalReviews } from '../api/client';
@@ -167,6 +167,235 @@ function GoogleReviews({ destination }: { destination: string }) {
   );
 }
 
+/**
+ * Popular destination cards for quick browsing.
+ * Shows curated top destinations with rating summary.
+ * On hover: transparent overlay with review snippets and rating circle.
+ */
+function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [expandedReviews, setExpandedReviews] = useState<Record<string, ExternalReview[]>>({});
+  const [loadingReviews, setLoadingReviews] = useState<Record<string, boolean>>({});
+
+  const popularDestinations = useMemo(() => [
+    { id: 'goa', name: 'Goa', country: 'India', image: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?q=80&w=400&auto=format&fit=crop', rating: 4.6, reviewCount: 125000, tagline: 'Beaches, nightlife & Portuguese heritage' },
+    { id: 'kerala', name: 'Kerala', country: 'India', image: 'https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?q=80&w=400&auto=format&fit=crop', rating: 4.7, reviewCount: 98000, tagline: 'Backwaters, ayurveda & spice hills' },
+    { id: 'agra', name: 'Taj Mahal, Agra', country: 'India', image: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?q=80&w=400&auto=format&fit=crop', rating: 4.8, reviewCount: 252000, tagline: 'Iconic marble mausoleum & Mughal history' },
+    { id: 'mumbai', name: 'Gateway of India, Mumbai', country: 'India', image: 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?q=80&w=400&auto=format&fit=crop', rating: 4.5, reviewCount: 89000, tagline: 'Historic arch overlooking the Arabian Sea' },
+    { id: 'rajasthan', name: 'Jaipur', country: 'India', image: 'https://images.unsplash.com/photo-1602099477144-70e24e4d8e9d?q=80&w=400&auto=format&fit=crop', rating: 4.6, reviewCount: 112000, tagline: 'Pink City palaces, forts & bazaars' },
+    { id: 'ladakh', name: 'Leh-Ladakh', country: 'India', image: 'https://images.unsplash.com/photo-1587474260584-13657452845b?q=80&w=400&auto=format&fit=crop', rating: 4.8, reviewCount: 67000, tagline: 'High-altitude desert, monasteries & lakes' },
+    { id: 'varanasi', name: 'Varanasi', country: 'India', image: 'https://images.unsplash.com/photo-1587440871870-8a0e3c6e37a9?q=80&w=400&auto=format&fit=crop', rating: 4.7, reviewCount: 74000, tagline: 'Spiritual heart on the Ganges ghats' },
+    { id: 'andaman', name: 'Andaman Islands', country: 'India', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=400&auto=format&fit=crop', rating: 4.7, reviewCount: 53000, tagline: 'Turquoise waters, coral reefs & white sand' },
+  ], []);
+
+  const fetchReviewsForCard = async (destination: string, destId: string) => {
+    if (expandedReviews[destId]?.length || loadingReviews[destId]) return;
+    setLoadingReviews(prev => ({ ...prev, [destId]: true }));
+    try {
+      const data = await fetchExternalReviews(destination);
+      setExpandedReviews(prev => ({ ...prev, [destId]: data }));
+    } catch {
+      setExpandedReviews(prev => ({ ...prev, [destId]: [] }));
+    } finally {
+      setLoadingReviews(prev => ({ ...prev, [destId]: false }));
+    }
+  };
+
+  return (
+    <section className="mt-16" aria-labelledby="popular-heading">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-coral mb-1.5">
+            Popular in India
+          </p>
+          <h2 id="popular-heading" className="text-2xl font-black text-brand-navy">
+            Top rated destinations nearby
+          </h2>
+        </div>
+        <p className="text-sm text-brand-muted hidden sm:block">
+          Hover a card to see reviews
+        </p>
+      </div>
+
+      <div className="relative">
+        <div
+          className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory"
+          style={{ scrollPaddingLeft: 24, scrollPaddingRight: 24 }}
+        >
+          {popularDestinations.map((dest, index) => (
+            <motion.div
+              key={dest.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.06 }}
+              className="relative flex-shrink-0 snap-start w-72 md:w-80"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {/* Card */}
+              <div className={`relative group bg-white/90 backdrop-blur border border-brand-border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ${hoveredIndex === index ? 'z-10' : ''}`}>
+                {/* Image */}
+                <div className="relative h-40 md:h-44 overflow-hidden">
+                  <img
+                    src={dest.image}
+                    alt={dest.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+                    <div>
+                      <p className="text-white font-black text-lg leading-tight drop-shadow-md">{dest.name}</p>
+                      <p className="text-white/90 text-xs font-medium flex items-center gap-1 drop-shadow-sm">
+                        <MapPin className="w-3 h-3" /> {dest.country}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur rounded-full px-3 py-1.5">
+                      <Star className="w-4 h-4 fill-brand-amber text-brand-amber" />
+                      <span className="font-black text-brand-navy tabular-nums">{dest.rating.toFixed(1)}</span>
+                      <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">{dest.reviewCount.toLocaleString()}+</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-4">
+                  <p className="text-sm text-brand-slate mb-3 line-clamp-2">{dest.tagline}</p>
+                  <div className="flex items-center justify-between pt-3 border-t border-brand-border">
+                    <span className="text-xs font-bold text-brand-muted uppercase tracking-widest">
+                      {dest.reviewCount.toLocaleString()} reviews
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fetchReviewsForCard(dest.name, dest.id);
+                      }}
+                      disabled={loadingReviews[dest.id] || expandedReviews[dest.id]?.length > 0}
+                      className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full transition-all ${
+                        loadingReviews[dest.id] || expandedReviews[dest.id]?.length > 0
+                          ? 'bg-brand-border text-brand-muted cursor-default'
+                          : 'bg-brand-coral/10 text-brand-coral hover:bg-brand-coral/20'
+                      }`}
+                    >
+                      {loadingReviews[dest.id] ? 'Loading…' : expandedReviews[dest.id]?.length ? 'View all' : 'Read reviews'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hover Overlay - Transparent Tab with Reviews & Rating Circle */}
+                <AnimatePresence mode="wait">
+                  {hoveredIndex === index && expandedReviews[dest.id] && expandedReviews[dest.id].length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute top-0 left-0 right-0 bottom-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 backdrop-blur-sm rounded-2xl p-6 overflow-auto z-20"
+                    >
+                      {/* Rating Circle */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="relative w-24 h-24 flex-shrink-0">
+                          <svg viewBox="0 0 96 96" className="w-full h-full transform -rotate-90">
+                            <circle
+                              cx="48" cy="48" r="40"
+                              stroke="rgba(14,23,42,0.1)"
+                              strokeWidth="8"
+                              fill="none"
+                            />
+                            <motion.circle
+                              cx="48" cy="48" r="40"
+                              stroke="url(#rating-gradient)"
+                              strokeWidth="8"
+                              fill="none"
+                              strokeLinecap="round"
+                              initial={{ strokeDashoffset: 251 }}
+                              animate={{ strokeDashoffset: 251 - (251 * dest.rating / 5) }}
+                              transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
+                            />
+                            <defs>
+                              <linearGradient id="rating-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stopColor="#f97316" />
+                                <stop offset="100%" stopColor="#f59e0b" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-2xl font-black text-brand-navy tabular-nums">{dest.rating.toFixed(1)}</span>
+                            <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">/ 5.0</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 ml-4 min-w-0">
+                          <p className="font-black text-brand-navy text-lg truncate">{dest.name}</p>
+                          <p className="text-sm text-brand-muted">{dest.reviewCount.toLocaleString()} Google reviews</p>
+                          <p className="text-xs text-brand-coral/80 font-semibold mt-1">{dest.tagline}</p>
+                        </div>
+                      </div>
+
+                      {/* Review snippets */}
+                      <div className="space-y-3 max-h-64 overflow-auto pr-2">
+                        {expandedReviews[dest.id]!.slice(0, 5).map((review, ri) => (
+                          <motion.div
+                            key={`${review.author}-${ri}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: ri * 0.05 }}
+                            className="bg-white/80 backdrop-blur border border-brand-border/50 rounded-xl p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-1.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-sand to-brand-blush/40 flex items-center justify-center shrink-0">
+                                  <UserIcon className="w-3.5 h-3.5 text-brand-muted" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-brand-navy text-sm truncate">{review.author}</p>
+                                  {review.visitedAt && (
+                                    <p className="text-[9px] uppercase tracking-wider text-brand-muted font-medium">
+                                      Visited {review.visitedAt}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {review.rating != null && <Stars rating={Math.round(review.rating)} size={11} />}
+                            </div>
+                            <p className="text-sm text-brand-slate leading-relaxed break-words border-l-[2px] border-brand-coral/40 pl-3">
+                              {review.text}
+                            </p>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {/* Sign in prompt */}
+                      <div className="mt-4 pt-4 border-t border-brand-border/50 text-center">
+                        {user ? (
+                          <span className="text-sm font-medium text-brand-coral">Signed in — you can add your review from the search above</span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              const ev = new CustomEvent('navigate', { detail: 'auth' });
+                              window.dispatchEvent(ev);
+                            }}
+                            className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors"
+                          >
+                            <Heart className="w-4 h-4" />
+                            Sign in to add your review
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Scroll hint gradient */}
+        <div className="absolute right-0 top-0 bottom-0 w-24 pointer-events-none bg-gradient-to-l from-white to-transparent" />
+      </div>
+    </section>
+  );
+}
+
 export default function ReviewsPage() {
   const { state, navigate } = useTripStore();
   // `search` is written by ReviewDestinations' search box and read by GoogleReviews.
@@ -199,6 +428,8 @@ export default function ReviewsPage() {
       </header>
 
       <ReviewDestinations user={state.user} onLogin={() => navigate('auth')} onSearch={onSearch} />
+
+      <PopularDestinationCards user={state.user} />
 
       <GoogleReviews destination={search} />
     </div>
