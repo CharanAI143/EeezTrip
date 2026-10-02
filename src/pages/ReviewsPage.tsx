@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, User as UserIcon, Star, Sparkles, WifiOff, MapPin, Heart } from 'lucide-react';
 import { ReviewDestinations } from '../components/ReviewDestinations';
@@ -176,6 +176,7 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState<Record<string, ExternalReview[]>>({});
   const [loadingReviews, setLoadingReviews] = useState<Record<string, boolean>>({});
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const popularDestinations = useMemo(() => [
     { id: 'goa', name: 'Goa', country: 'India', image: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?q=80&w=400&auto=format&fit=crop', rating: 4.6, reviewCount: 125000, tagline: 'Beaches, nightlife & Portuguese heritage' },
@@ -201,6 +202,23 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
     }
   };
 
+  const getPanelStyle = (index: number) => {
+    const card = cardRefs.current[index];
+    if (!card) return {};
+    const rect = card.getBoundingClientRect();
+    const containerRect = card.parentElement?.getBoundingClientRect();
+    if (!containerRect) return {};
+    // Position panel to the right of the card, within viewport
+    const panelWidth = 380; // md:w-[380px]
+    const gap = 12; // ml-3
+    let left = rect.right - containerRect.left + gap;
+    const maxLeft = containerRect.width - panelWidth - 8;
+    if (left > maxLeft) left = maxLeft;
+    if (left < 0) left = 8;
+    const top = rect.top - containerRect.top;
+    return { left: `${left}px`, top: `${top}px`, width: `${panelWidth}px` };
+  };
+
   return (
     <section className="mt-16" aria-labelledby="popular-heading">
       <div className="flex items-center justify-between mb-6">
@@ -222,6 +240,7 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
           {popularDestinations.map((dest, index) => (
             <motion.div
               key={dest.id}
+              ref={(el) => { cardRefs.current[index] = el; }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.06 }}
@@ -267,142 +286,152 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
                     </span>
                   </div>
                 </div>
-
-                {/* Hover Side Panel - Transparent Tab with Reviews & Rating Circle */}
-                <AnimatePresence mode="wait">
-                  {hoveredIndex === index && (
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute left-full top-0 bottom-0 w-96 md:w-[380px] ml-3 bg-gradient-to-br from-black/3 via-black/5 to-black/10 backdrop-blur-sm rounded-2xl p-5 overflow-auto z-20 border border-brand-border/20 shadow-2xl"
-                      onMouseEnter={() => {
-                        if (!expandedReviews[dest.id]?.length && !loadingReviews[dest.id]) {
-                          fetchReviewsForCard(dest.name, dest.id);
-                        }
-                      }}
-                    >
-                      {/* Rating Circle */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="relative w-24 h-24 flex-shrink-0">
-                          <svg viewBox="0 0 96 96" className="w-full h-full transform -rotate-90">
-                            <circle
-                              cx="48" cy="48" r="40"
-                              stroke="rgba(14,23,42,0.1)"
-                              strokeWidth="8"
-                              fill="none"
-                            />
-                            <motion.circle
-                              cx="48" cy="48" r="40"
-                              stroke="url(#rating-gradient)"
-                              strokeWidth="8"
-                              fill="none"
-                              strokeLinecap="round"
-                              initial={{ strokeDashoffset: 251 }}
-                              animate={{ strokeDashoffset: 251 - (251 * dest.rating / 5) }}
-                              transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
-                            />
-                            <defs>
-                              <linearGradient id="rating-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stopColor="#f97316" />
-                                <stop offset="100%" stopColor="#f59e0b" />
-                              </linearGradient>
-                            </defs>
-                          </svg>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-2xl font-black text-brand-navy tabular-nums">{dest.rating.toFixed(1)}</span>
-                            <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">/ 5.0</span>
-                          </div>
-                        </div>
-                        <div className="flex-1 ml-4 min-w-0">
-                          <p className="font-black text-brand-navy text-lg truncate">{dest.name}</p>
-                          <p className="text-sm text-brand-muted">{dest.reviewCount.toLocaleString()} Google reviews</p>
-                          <p className="text-xs text-brand-coral/80 font-semibold mt-1">{dest.tagline}</p>
-                        </div>
-                      </div>
-
-                      {/* Review snippets */}
-                      <div className="space-y-3 max-h-[500px] overflow-auto pr-2">
-                        {expandedReviews[dest.id] && expandedReviews[dest.id].length > 0 ? (
-                          expandedReviews[dest.id]!.slice(0, 5).map((review, ri) => (
-                            <motion.div
-                              key={`${review.author}-${ri}`}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: ri * 0.05 }}
-                              className="bg-white/80 backdrop-blur border border-brand-border/50 rounded-xl p-3"
-                            >
-                              <div className="flex items-start justify-between gap-3 mb-1.5">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-sand to-brand-blush/40 flex items-center justify-center shrink-0">
-                                    <UserIcon className="w-3.5 h-3.5 text-brand-muted" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-semibold text-brand-navy text-sm truncate">{review.author}</p>
-                                    {review.visitedAt && (
-                                      <p className="text-[9px] uppercase tracking-wider text-brand-muted font-medium">
-                                        Visited {review.visitedAt}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                {review.rating != null && <Stars rating={Math.round(review.rating)} size={11} />}
-                              </div>
-                              <p className="text-sm text-brand-slate leading-relaxed break-words border-l-[2px] border-brand-coral/40 pl-3">
-                                {review.text}
-                              </p>
-                            </motion.div>
-                          ))
-                        ) : loadingReviews[dest.id] ? (
-                          <div className="flex items-center justify-center py-8 text-brand-muted text-sm">
-                            <Loader2 className="w-5 h-5 animate-spin mr-2 text-brand-coral" />
-                            Loading reviews…
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-brand-muted text-sm space-y-2">
-                            <p>Reviews load when you hover</p>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                fetchReviewsForCard(dest.name, dest.id);
-                              }}
-                              className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors mx-auto"
-                            >
-                              Read reviews
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Sign in prompt */}
-                      <div className="mt-4 pt-4 border-t border-brand-border/50 text-center">
-                        {user ? (
-                          <span className="text-sm font-medium text-brand-coral">Signed in — you can add your review from the search above</span>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              const ev = new CustomEvent('navigate', { detail: 'auth' });
-                              window.dispatchEvent(ev);
-                            }}
-                            className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors"
-                          >
-                            <Heart className="w-4 h-4" />
-                            Sign in to add your review
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
             </motion.div>
           ))}
         </div>
 
+        {/* Hover Side Panel - rendered outside scroll container */}
+        <AnimatePresence mode="wait">
+          {hoveredIndex !== null && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+              style={getPanelStyle(hoveredIndex)}
+              className="absolute bg-gradient-to-br from-black/3 via-black/5 to-black/10 backdrop-blur-sm rounded-2xl p-5 overflow-auto z-30 border border-brand-border/20 shadow-2xl pointer-events-auto"
+              onMouseEnter={() => {
+                const dest = popularDestinations[hoveredIndex!];
+                if (!expandedReviews[dest.id]?.length && !loadingReviews[dest.id]) {
+                  fetchReviewsForCard(dest.name, dest.id);
+                }
+              }}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {(() => {
+                const dest = popularDestinations[hoveredIndex!];
+                return (
+                  <>
+                    {/* Rating Circle */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="relative w-24 h-24 flex-shrink-0">
+                        <svg viewBox="0 0 96 96" className="w-full h-full transform -rotate-90">
+                          <circle
+                            cx="48" cy="48" r="40"
+                            stroke="rgba(14,23,42,0.1)"
+                            strokeWidth="8"
+                            fill="none"
+                          />
+                          <motion.circle
+                            cx="48" cy="48" r="40"
+                            stroke="url(#rating-gradient)"
+                            strokeWidth="8"
+                            fill="none"
+                            strokeLinecap="round"
+                            initial={{ strokeDashoffset: 251 }}
+                            animate={{ strokeDashoffset: 251 - (251 * dest.rating / 5) }}
+                            transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
+                          />
+                          <defs>
+                            <linearGradient id="rating-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor="#f97316" />
+                              <stop offset="100%" stopColor="#f59e0b" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-2xl font-black text-brand-navy tabular-nums">{dest.rating.toFixed(1)}</span>
+                          <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">/ 5.0</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 ml-4 min-w-0">
+                        <p className="font-black text-brand-navy text-lg truncate">{dest.name}</p>
+                        <p className="text-sm text-brand-muted">{dest.reviewCount.toLocaleString()} Google reviews</p>
+                        <p className="text-xs text-brand-coral/80 font-semibold mt-1">{dest.tagline}</p>
+                      </div>
+                    </div>
+
+                    {/* Review snippets */}
+                    <div className="space-y-3 max-h-[500px] overflow-auto pr-2">
+                      {expandedReviews[dest.id] && expandedReviews[dest.id].length > 0 ? (
+                        expandedReviews[dest.id]!.slice(0, 5).map((review, ri) => (
+                          <motion.div
+                            key={`${review.author}-${ri}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: ri * 0.05 }}
+                            className="bg-white/80 backdrop-blur border border-brand-border/50 rounded-xl p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-1.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-sand to-brand-blush/40 flex items-center justify-center shrink-0">
+                                  <UserIcon className="w-3.5 h-3.5 text-brand-muted" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-brand-navy text-sm truncate">{review.author}</p>
+                                  {review.visitedAt && (
+                                    <p className="text-[9px] uppercase tracking-wider text-brand-muted font-medium">
+                                      Visited {review.visitedAt}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {review.rating != null && <Stars rating={Math.round(review.rating)} size={11} />}
+                            </div>
+                            <p className="text-sm text-brand-slate leading-relaxed break-words border-l-[2px] border-brand-coral/40 pl-3">
+                              {review.text}
+                            </p>
+                          </motion.div>
+                        ))
+                      ) : loadingReviews[dest.id] ? (
+                        <div className="flex items-center justify-center py-8 text-brand-muted text-sm">
+                          <Loader2 className="w-5 h-5 animate-spin mr-2 text-brand-coral" />
+                          Loading reviews…
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-brand-muted text-sm space-y-2">
+                          <p>Reviews load when you hover</p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fetchReviewsForCard(dest.name, dest.id);
+                            }}
+                            className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors mx-auto"
+                          >
+                            Read reviews
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sign in prompt */}
+                    <div className="mt-4 pt-4 border-t border-brand-border/50 text-center">
+                      {user ? (
+                        <span className="text-sm font-medium text-brand-coral">Signed in — you can add your review from the search above</span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const ev = new CustomEvent('navigate', { detail: 'auth' });
+                            window.dispatchEvent(ev);
+                          }}
+                          className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors"
+                        >
+                          <Heart className="w-4 h-4" />
+                          Sign in to add your review
+                        </button>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        </div>
+
         {/* Scroll hint gradient */}
         <div className="absolute right-0 top-0 bottom-0 w-24 pointer-events-none bg-gradient-to-l from-white to-transparent" />
-      </div>
     </section>
   );
 }
