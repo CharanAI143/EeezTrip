@@ -26,10 +26,10 @@ const PAGE_PROGRESS: Record<Page, number> = {
   auth: 0,
 };
 
-// Animated E+T → Airplane Logo Component
+// Animated EEEZTRIP → Airplane Logo Component
 function ETPlaneLogo() {
   return (
-    <svg width="44" height="44" viewBox="0 0 1200 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="44" height="44" viewBox="0 0 1200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#0ea5e9" />
@@ -43,131 +43,153 @@ function ETPlaneLogo() {
         </linearGradient>
       </defs>
 
-      {/* Starting E - moves right toward nose */}
+      {/* Phase 1: EEEZTRIP word appears - EEEZ blue, TRIP pink */}
       <motion.g
-        initial={{ opacity: 1, x: 0, scale: 1 }}
-        animate={{ opacity: 0, x: 160, scale: 0.82 }}
-        transition={{ duration: 1.8, ease: [0.65, 0, 0.35, 1] }}
-        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
       >
-        <g fill="url(#blue-gradient)">
-          <rect x="100" y="190" width="145" height="35" rx="4" />
-          <rect x="100" y="235" width="110" height="35" rx="4" />
-          <rect x="100" y="280" width="145" height="35" rx="4" />
-        </g>
+        <text
+          x="540"
+          y="100"
+          font-size="48"
+          font-weight="800"
+          font-family="Arial, Helvetica, sans-serif"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          letter-spacing="2"
+        >
+          <tspan fill="url(#blue-gradient)" font-weight="900">EEEZ</tspan>
+          <tspan fill="url(#pink-gradient)" font-weight="900">TRIP</tspan>
+        </text>
       </motion.g>
 
-      {/* Starting T - moves left toward tail */}
+      {/* Phase 2: Letters melt together - merge into center */}
       <motion.g
-        initial={{ opacity: 1, x: 0, scale: 1 }}
-        animate={{ opacity: 0, x: -150, scale: 0.82 }}
-        transition={{ duration: 1.8, ease: [0.65, 0, 0.35, 1] }}
-        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0, 1, 1, 0] }}
+        transition={{ duration: 4.5, ease: [0.4, 0, 0.2, 1] }}
       >
-        <g fill="url(#blue-gradient)">
-          <rect x="925" y="185" width="170" height="40" rx="4" />
-          <rect x="985" y="215" width="50" height="125" rx="4" />
-        </g>
+        {/* Melt phase - letters compress toward center */}
+        <motion.text
+          x="540"
+          y="100"
+          font-size="48"
+          font-weight="800"
+          font-family="Arial, Helvetica, sans-serif"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          letter-spacing={[-2, -4, -8, -12, -20]}
+          fill="url(#blue-gradient)"
+        >
+          EEEZTRIP
+        </motion.text>
       </motion.g>
 
-      {/* Final Airplane */}
-      <g>
-        {/* Main body - grows from center */}
-        <motion.path
-          fill="url(#blue-gradient)"
-          d="
-            M 235 250
-            C 265 210, 315 195, 375 198
-            L 690 220
-            C 775 226, 850 226, 920 218
-            L 985 210
-            L 985 290
-            L 920 282
-            C 850 274, 775 274, 690 280
-            L 375 302
-            C 315 305, 265 290, 235 250
-            Z
-          "
-          initial={{ opacity: 0, scaleX: 0, transformOrigin: 'center' }}
-          animate={{ opacity: 1, scaleX: 1 }}
-          transition={{ duration: 1.25, delay: 1.15, ease: [0.22, 1, 0.36, 1] }}
-        />
+      {/* Phase 3: Melted blob transforms into airplane */}
+      <motion.g
+        initial={{ opacity: 0, scale: 0.3 }}
+        animate={{ opacity: [0, 0, 0, 1], scale: [0.5, 0.5, 0.5, 1] }}
+        transition={{ duration: 1.5, delay: 3.5, ease: [0.34, 1.56, 0.64, 1] }}
+      >
+        <g>
+          {/* Main airplane body - blue */}
+          <motion.path
+            fill="url(#blue-gradient)"
+            d="
+              M 235 250
+              C 265 210, 315 195, 375 198
+              L 690 220
+              C 775 226, 850 226, 920 218
+              L 985 210
+              L 985 290
+              L 920 282
+              C 850 274, 775 274, 690 280
+              L 375 302
+              C 315 305, 265 290, 235 250
+              Z
+            "
+            initial={{ opacity: 0, scaleX: 0, transformOrigin: 'center' }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            transition={{ duration: 1.25, delay: 3.8, ease: [0.22, 1, 0.36, 1] }}
+          />
 
-        {/* Upper wing */}
-        <motion.path
-          fill="url(#blue-gradient)"
-          d="
-            M 475 215
-            L 650 55
-            C 665 42, 690 40, 715 43
-            L 625 225
-            Z
-          "
-          initial={{ opacity: 0, scale: 0, transformOrigin: 'center' }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.1, delay: 1.35, ease: [0.22, 1, 0.36, 1] }}
-        />
+          {/* Upper wing */}
+          <motion.path
+            fill="url(#blue-gradient)"
+            d="
+              M 475 215
+              L 650 55
+              C 665 42, 690 40, 715 43
+              L 625 225
+              Z
+            "
+            initial={{ opacity: 0, scale: 0, transformOrigin: 'center' }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.1, delay: 3.9, ease: [0.22, 1, 0.36, 1] }}
+          />
 
-        {/* Lower wing */}
-        <motion.path
-          fill="url(#blue-gradient)"
-          d="
-            M 475 285
-            L 650 445
-            C 665 458, 690 460, 715 457
-            L 625 275
-            Z
-          "
-          initial={{ opacity: 0, scale: 0, transformOrigin: 'center' }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.1, delay: 1.48, ease: [0.22, 1, 0.36, 1] }}
-        />
+          {/* Lower wing */}
+          <motion.path
+            fill="url(#blue-gradient)"
+            d="
+              M 475 285
+              L 650 445
+              C 665 458, 690 460, 715 457
+              L 625 275
+              Z
+            "
+            initial={{ opacity: 0, scale: 0, transformOrigin: 'center' }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.1, delay: 4.0, ease: [0.22, 1, 0.36, 1] }}
+          />
 
-        {/* Tail - PINK (from T) */}
-        <motion.path
-          fill="url(#pink-gradient)"
-          d="
-            M 900 220
-            L 985 145
-            C 995 137, 1010 135, 1030 136
-            L 1010 220
-            L 1010 280
-            L 1030 364
-            C 1010 365, 995 363, 985 355
-            L 900 280
-            Z
-          "
-          initial={{ opacity: 0, x: 30, scale: 0.2, transformOrigin: 'center' }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          transition={{ duration: 1, delay: 1.35, ease: [0.22, 1, 0.36, 1] }}
-        />
+          {/* Tail - PINK (from TRIP) */}
+          <motion.path
+            fill="url(#pink-gradient)"
+            d="
+              M 900 220
+              L 985 145
+              C 995 137, 1010 135, 1030 136
+              L 1010 220
+              L 1010 280
+              L 1030 364
+              C 1010 365, 995 363, 985 355
+              L 900 280
+              Z
+            "
+            initial={{ opacity: 0, x: 30, scale: 0.2, transformOrigin: 'center' }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ duration: 1, delay: 3.7, ease: [0.22, 1, 0.36, 1] }}
+          />
 
-        {/* E-shaped nose cutout - pink */}
-        <motion.path
-          fill="url(#pink-gradient)"
-          fillRule="evenodd"
-          d="
-            M 235 250
-            C 250 220, 275 207, 310 207
-            L 395 207
-            L 395 228
-            L 300 228
-            L 300 240
-            L 370 240
-            L 370 260
-            L 300 260
-            L 300 272
-            L 395 272
-            L 395 293
-            L 310 293
-            C 275 293, 250 280, 235 250
-            Z
-          "
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.9, delay: 1.55, ease: 'easeOut' }}
-        />
-      </g>
+          {/* E-shaped nose cutout - pink */}
+          <motion.path
+            fill="url(#pink-gradient)"
+            fillRule="evenodd"
+            d="
+              M 235 250
+              C 250 220, 275 207, 310 207
+              L 395 207
+              L 395 228
+              L 300 228
+              L 300 240
+              L 370 240
+              L 370 260
+              L 300 260
+              L 300 272
+              L 395 272
+              L 395 293
+              L 310 293
+              C 275 293, 250 280, 235 250
+              Z
+            "
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.9, delay: 4.2, ease: 'easeOut' }}
+          />
+        </g>
+      </motion.g>
     </svg>
   );
 }
