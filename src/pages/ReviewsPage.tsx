@@ -172,7 +172,7 @@ function GoogleReviews({ destination }: { destination: string }) {
  * Shows curated top destinations with rating summary.
  * On hover: transparent overlay with review snippets and rating circle.
  */
-function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
+function PopularDestinationCards({ user, navigate }: { user: { uid: string } | null; navigate: (page: string) => void }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expandedReviews, setExpandedReviews] = useState<Record<string, ExternalReview[]>>({});
@@ -429,10 +429,7 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
                         <span className="text-sm font-medium text-brand-coral">Signed in — you can add your review from the search above</span>
                       ) : (
                         <button
-                          onClick={() => {
-                            const ev = new CustomEvent('navigate', { detail: 'auth' });
-                            window.dispatchEvent(ev);
-                          }}
+                          onClick={() => navigate('auth')}
                           className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors"
                         >
                           <Heart className="w-4 h-4" />
@@ -487,7 +484,7 @@ export default function ReviewsPage() {
 
       <ReviewDestinations user={state.user} onLogin={() => navigate('auth')} onSearch={onSearch} />
 
-      <PopularDestinationCards user={state.user} />
+      <PopularDestinationCards user={state.user} navigate={navigate} />
 
       <GoogleReviews destination={search} />
     </div>
