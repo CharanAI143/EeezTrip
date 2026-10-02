@@ -262,32 +262,21 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
                     <span className="text-xs font-bold text-brand-muted uppercase tracking-widest">
                       {dest.reviewCount.toLocaleString()} reviews
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fetchReviewsForCard(dest.name, dest.id);
-                      }}
-                      disabled={loadingReviews[dest.id] || expandedReviews[dest.id]?.length > 0}
-                      className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full transition-all ${
-                        loadingReviews[dest.id] || expandedReviews[dest.id]?.length > 0
-                          ? 'bg-brand-border text-brand-muted cursor-default'
-                          : 'bg-brand-coral/10 text-brand-coral hover:bg-brand-coral/20'
-                      }`}
-                    >
-                      {loadingReviews[dest.id] ? 'Loading…' : expandedReviews[dest.id]?.length ? 'View all' : 'Read reviews'}
-                    </button>
+                    <span className="text-xs font-medium text-brand-coral/70 hidden sm:block">
+                      Hover for reviews
+                    </span>
                   </div>
                 </div>
 
-                {/* Hover Overlay - Transparent Tab with Reviews & Rating Circle */}
+                {/* Hover Side Panel - Transparent Tab with Reviews & Rating Circle */}
                 <AnimatePresence mode="wait">
                   {hoveredIndex === index && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
                       transition={{ duration: 0.2 }}
-                      className="absolute top-0 left-0 right-0 bottom-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 backdrop-blur-sm rounded-2xl p-6 overflow-auto z-20"
+                      className="absolute left-full top-0 bottom-0 w-96 md:w-[380px] ml-3 bg-gradient-to-br from-black/3 via-black/5 to-black/10 backdrop-blur-sm rounded-2xl p-5 overflow-auto z-20 border border-brand-border/20 shadow-2xl"
                       onMouseEnter={() => {
                         if (!expandedReviews[dest.id]?.length && !loadingReviews[dest.id]) {
                           fetchReviewsForCard(dest.name, dest.id);
@@ -334,7 +323,7 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
                       </div>
 
                       {/* Review snippets */}
-                      <div className="space-y-3 max-h-64 overflow-auto pr-2">
+                      <div className="space-y-3 max-h-[500px] overflow-auto pr-2">
                         {expandedReviews[dest.id] && expandedReviews[dest.id].length > 0 ? (
                           expandedReviews[dest.id]!.slice(0, 5).map((review, ri) => (
                             <motion.div
@@ -371,9 +360,17 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
                             Loading reviews…
                           </div>
                         ) : (
-                          <div className="text-center py-8 text-brand-muted text-sm">
-                            <p>Hover to load Google reviews</p>
-                            <p className="text-xs mt-1">Click "Read reviews" on the card to fetch them</p>
+                          <div className="text-center py-6 text-brand-muted text-sm space-y-2">
+                            <p>Reviews load when you hover</p>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fetchReviewsForCard(dest.name, dest.id);
+                              }}
+                              className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 px-4 py-2 rounded-full transition-colors mx-auto"
+                            >
+                              Read reviews
+                            </button>
                           </div>
                         )}
                       </div>
