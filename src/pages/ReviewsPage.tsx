@@ -212,9 +212,6 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
             Top rated destinations nearby
           </h2>
         </div>
-        <p className="text-sm text-brand-muted hidden sm:block">
-          Hover a card to see reviews
-        </p>
       </div>
 
       <div className="relative">
@@ -284,13 +281,18 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
 
                 {/* Hover Overlay - Transparent Tab with Reviews & Rating Circle */}
                 <AnimatePresence mode="wait">
-                  {hoveredIndex === index && expandedReviews[dest.id] && expandedReviews[dest.id].length > 0 && (
+                  {hoveredIndex === index && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                       className="absolute top-0 left-0 right-0 bottom-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 backdrop-blur-sm rounded-2xl p-6 overflow-auto z-20"
+                      onMouseEnter={() => {
+                        if (!expandedReviews[dest.id]?.length && !loadingReviews[dest.id]) {
+                          fetchReviewsForCard(dest.name, dest.id);
+                        }
+                      }}
                     >
                       {/* Rating Circle */}
                       <div className="flex items-center justify-between mb-4">
@@ -333,35 +335,47 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
 
                       {/* Review snippets */}
                       <div className="space-y-3 max-h-64 overflow-auto pr-2">
-                        {expandedReviews[dest.id]!.slice(0, 5).map((review, ri) => (
-                          <motion.div
-                            key={`${review.author}-${ri}`}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: ri * 0.05 }}
-                            className="bg-white/80 backdrop-blur border border-brand-border/50 rounded-xl p-3"
-                          >
-                            <div className="flex items-start justify-between gap-3 mb-1.5">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-sand to-brand-blush/40 flex items-center justify-center shrink-0">
-                                  <UserIcon className="w-3.5 h-3.5 text-brand-muted" />
+                        {expandedReviews[dest.id] && expandedReviews[dest.id].length > 0 ? (
+                          expandedReviews[dest.id]!.slice(0, 5).map((review, ri) => (
+                            <motion.div
+                              key={`${review.author}-${ri}`}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: ri * 0.05 }}
+                              className="bg-white/80 backdrop-blur border border-brand-border/50 rounded-xl p-3"
+                            >
+                              <div className="flex items-start justify-between gap-3 mb-1.5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-sand to-brand-blush/40 flex items-center justify-center shrink-0">
+                                    <UserIcon className="w-3.5 h-3.5 text-brand-muted" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-brand-navy text-sm truncate">{review.author}</p>
+                                    {review.visitedAt && (
+                                      <p className="text-[9px] uppercase tracking-wider text-brand-muted font-medium">
+                                        Visited {review.visitedAt}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-brand-navy text-sm truncate">{review.author}</p>
-                                  {review.visitedAt && (
-                                    <p className="text-[9px] uppercase tracking-wider text-brand-muted font-medium">
-                                      Visited {review.visitedAt}
-                                    </p>
-                                  )}
-                                </div>
+                                {review.rating != null && <Stars rating={Math.round(review.rating)} size={11} />}
                               </div>
-                              {review.rating != null && <Stars rating={Math.round(review.rating)} size={11} />}
-                            </div>
-                            <p className="text-sm text-brand-slate leading-relaxed break-words border-l-[2px] border-brand-coral/40 pl-3">
-                              {review.text}
-                            </p>
-                          </motion.div>
-                        ))}
+                              <p className="text-sm text-brand-slate leading-relaxed break-words border-l-[2px] border-brand-coral/40 pl-3">
+                                {review.text}
+                              </p>
+                            </motion.div>
+                          ))
+                        ) : loadingReviews[dest.id] ? (
+                          <div className="flex items-center justify-center py-8 text-brand-muted text-sm">
+                            <Loader2 className="w-5 h-5 animate-spin mr-2 text-brand-coral" />
+                            Loading reviews…
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-brand-muted text-sm">
+                            <p>Hover to load Google reviews</p>
+                            <p className="text-xs mt-1">Click "Read reviews" on the card to fetch them</p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Sign in prompt */}
