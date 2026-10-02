@@ -197,7 +197,7 @@ export default function AuthPage() {
           }}
         >
           {busy === 'microsoft' ? <Loader2 size={18} className="animate-spin" /> : MICROSOFT_MARK}
-          Continue with Outlook
+          Continue with Microsoft
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#94a3b8', fontSize: '0.8rem' }}>
