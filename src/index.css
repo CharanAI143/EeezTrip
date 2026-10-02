@@ -55,8 +55,38 @@
   --radius-full: 9999px;
 }
 
+/* ── Tailwind brand scale ──────────────────────────────────────────────────
+   ReviewDestinations was written against `brand-*` utility classes that were
+   never defined, so every colour in it silently resolved to nothing and the
+   component rendered unstyled — which is part of why it sat unmounted for so
+   long. These expose the palettes above under the names the components already
+   use, so the design system stays in one place instead of each component
+   inventing hex values. */
+@theme {
+  --color-brand-navy:   var(--deep);
+  --color-brand-slate:  var(--mid);
+  --color-brand-muted:  var(--muted);
+  --color-brand-ice:    var(--ice-500);
+  --color-brand-coral:  var(--pink-500);
+  --color-brand-blush:  var(--pink-300);
+  --color-brand-orange: #f97316;
+  --color-brand-amber:  #f59e0b;
+  /* Sand is the warm neutral used for inset fields and chips. Deliberately not
+     an ice tint: a warm inset against the cool ice surface is what stops the
+     form reading as one flat blue block. */
+  --color-brand-sand:   #fdf6ee;
+  --color-brand-border: #cfe6f5;
+}
+
 /* ── Reset ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* This MUST live in @layer base. Written unlayered it outranked every margin and
+   padding utility in `@layer utilities` — unlayered rules beat layered ones
+   regardless of specificity — so `mx-auto`, `px-6`, `mt-8` and the rest were
+   silently dropped and every page rendered flush to the left edge. Tailwind's own
+   preflight already applies this same reset inside the base layer. */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+}
 
 html {
   scroll-behavior: smooth;
@@ -208,6 +238,51 @@ h1, h2, h3, h4, h5, h6 {
    padding alone rendered them at ~36px. */
 .btn-sm { padding: 8px 18px; font-size: 0.875rem; min-height: 44px; }
 
+/* ── Page offset under the fixed header ── */
+/* The header is position:fixed, so page content has to reserve its height or the
+   first block renders underneath it. It cannot be a hardcoded constant: the nav
+   is one flex row, and on narrow viewports the links and CTA wrap inside their
+   buttons, so the bar is taller than on a desktop. Navbar.tsx measures itself
+   and publishes the result as `--nav-h`; this offsets by the measured truth plus
+   breathing room. The fallback only applies before the first measurement lands. */
+.page-offset-nav {
+  padding-top: calc(var(--nav-h, 99px) + 2rem);
+}
+
+/* ── Reviews search bar ── */
+
+/* The search field and its button have to be exactly the same height, and
+   Tailwind padding utilities cannot do it: `.btn-pink` above is unlayered, and
+   unlayered rules beat everything in `@layer utilities` regardless of
+   specificity (see the chat-composer note further down). So `py-3.5` on the
+   button was silently dropped and it rendered 32px wide and 16px tall, drifting
+   out of line with the input. Both halves are sized here, after `.btn-pink`, off
+   one shared custom property so they cannot disagree. */
+.reviews-bar {
+  --reviews-bar-height: 52px;
+}
+/* The magnifier used to be absolutely positioned over the input and cleared with
+   `pl-12`. That couples the two by hand: any change to the icon's offset or width
+   silently lets the placeholder run underneath it. Icon and field are flex
+   siblings here instead, so they can never overlap at any width. */
+.reviews-search {
+  height: var(--reviews-bar-height);
+  box-sizing: border-box;
+}
+.reviews-search-field {
+  height: 100%;
+  /* Height is owned by the wrapper; the field just fills it. */
+  line-height: normal;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+.reviews-search-btn {
+  height: var(--reviews-bar-height);
+  padding: 0 1.75rem;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
 /* ── Badge / Chip ── */
 .badge {
   display: inline-flex;
@@ -351,6 +426,17 @@ h1, h2, h3, h4, h5, h6 {
 .chat-composer:focus-visible,
 .chat-composer input:focus-visible,
 .chat-composer textarea:focus-visible {
+  outline: none;
+}
+
+/* Same story for the reviews inputs. Each already carries its own focus
+   treatment — a full-opacity pink border plus a ring — so the global ice-blue
+   outline did not add a cue, it stacked a second, differently-coloured
+   rectangle inside the pink one on every click. Text inputs match
+   `:focus-visible` on mouse click, not just keyboard, so this fired constantly.
+   The pink border remains the single focus indicator. */
+.reviews-search input:focus-visible,
+.reviews-field:focus-visible {
   outline: none;
 }
 

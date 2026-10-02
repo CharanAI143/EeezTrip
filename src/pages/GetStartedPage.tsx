@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useTripStore } from '../state/tripStore';
+import boltIcon from '../assets/bolt.png';
 
 const POPULAR = [
   { name: 'Santorini', image: 'https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?q=80&w=200&auto=format&fit=crop' },
@@ -54,8 +55,15 @@ export default function GetStartedPage() {
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
             color: '#3f7295', fontWeight: 600, fontSize: '0.95rem',
+            opacity: 0, transform: 'translateY(6px) scale(0.995)', animation: 'gs-fade-up 0.45s cubic-bezier(0.2,0.8,0.2,1) forwards',
           }}
         >
+          <style>{`
+            @keyframes gs-fade-up { to { opacity: 1; transform: translateY(0) scale(1); } }
+            .gs-chip { opacity: 0; transform: translateY(4px); animation: gs-fade-up 0.38s ease-out forwards; }
+            .gs-chip:nth-child(2) { animation-delay: 70ms; }
+            .gs-chip:nth-child(3) { animation-delay: 140ms; }
+          `}</style>
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
@@ -93,17 +101,21 @@ export default function GetStartedPage() {
           <form onSubmit={handleSubmit} style={{ position: 'relative', marginBottom: 56 }}>
             <div style={{
               display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 0,
               background: '#fff',
-              border: `1px solid ${focused ? '#38bdf8' : 'rgba(0,0,0,0.08)'}`,
+              border: `1px solid ${focused ? '#38bdf8' : 'rgba(14,23,42,0.12)'}`,
               borderRadius: 999,
               overflow: 'hidden',
               boxShadow: focused
-                ? '0 0 0 4px rgba(56,189,248,0.15), 0 20px 40px rgba(12,27,51,0.08)'
-                : '0 10px 30px rgba(12,27,51,0.05)',
+                ? '0 0 0 4px rgba(14,165,233,0.15), 0 24px 80px -32px rgba(14,23,42,0.45)'
+                : '0 20px 60px -30px rgba(14,23,42,0.45)',
+              backdropFilter: 'blur(8px)',
               transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}>
               {/* Origin Input */}
-              <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
+              <div style={{ display: 'flex', flex: 1, minWidth: 0, borderRight: '1px solid rgba(14,23,42,0.08)', padding: '4px 0' }}>
                 <span style={{
                   paddingLeft: 28, display: 'flex', alignItems: 'center',
                   color: '#0ea5e9', flexShrink: 0,
@@ -120,7 +132,7 @@ export default function GetStartedPage() {
                   onChange={e => dispatch({ type: 'SET_PREF', field: 'origin', value: e.target.value })}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  placeholder="Leaving from (Optional)"
+                  placeholder="Leaving from (optional)"
                   minLength={2}
                   style={{
                     flex: 1, border: 'none', outline: 'none', background: 'transparent',
@@ -129,11 +141,11 @@ export default function GetStartedPage() {
                     minWidth: 0,
                   }}
                 />
-                <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
+                <div style={{ width: 1, background: 'rgba(14,23,42,0.08)', margin: '10px 0' }} />
               </div>
 
               {/* Destination Input */}
-              <div style={{ display: 'flex', flex: 1 }}>
+              <div style={{ display: 'flex', flex: 1, minWidth: 0, padding: '4px 0' }}>
                 <span style={{
                   paddingLeft: 20, display: 'flex', alignItems: 'center',
                   color: '#ec4899', flexShrink: 0,
@@ -149,13 +161,16 @@ export default function GetStartedPage() {
                   onChange={e => dispatch({ type: 'SET_PREF', field: 'destination', value: e.target.value })}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  placeholder="Where to?"
+                  placeholder="Where to? (destination)"
                   required
                   minLength={2}
                   style={{
                     flex: 1, border: 'none', outline: 'none', background: 'transparent',
-                    padding: '22px 20px', fontFamily: 'Outfit, sans-serif',
-                    fontSize: '1.15rem', fontWeight: 500, color: '#0c1b33',
+                    padding: '18px 20px 18px 12px',
+                    fontFamily: 'Outfit, sans-serif',
+                    fontSize: '1.08rem',
+                    fontWeight: 500,
+                    color: '#0c1b33',
                     minWidth: 0,
                   }}
                 />
@@ -166,10 +181,29 @@ export default function GetStartedPage() {
                 className="btn btn-primary"
                 disabled={destination.trim().length < 2}
                 style={{
-                  margin: 8, borderRadius: 999,
-                  padding: '14px 36px',
-                  fontSize: '1.05rem',
+                  margin: 4,
+                  borderRadius: 999,
+                  padding: '12px 30px',
+                  fontSize: '1.02rem',
                   flexShrink: 0,
+                  alignSelf: 'center',
+                  whiteSpace: 'nowrap',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease',
+                  boxShadow: '0 10px 40px -20px rgba(14,165,233,0.4)',
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)';
+                  (e.target as HTMLButtonElement).style.boxShadow = '0 12px 48px -20px rgba(99,102,241,0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+                  (e.target as HTMLButtonElement).style.boxShadow = '0 10px 40px -20px rgba(14,165,233,0.4)';
+                }}
+                onMouseDown={(e) => {
+                  (e.target as HTMLButtonElement).style.transform = 'scale(0.995)';
+                }}
+                onMouseUp={(e) => {
+                  (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)';
                 }}
               >
                 Continue
@@ -247,10 +281,11 @@ export default function GetStartedPage() {
         }}>
           {[
             { icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>, text: 'No signup required' },
-            { icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>, text: 'Results in seconds' },
+            { icon: <img src={boltIcon} alt="" width={20} height={20} style={{ display: 'block' }} />, text: 'Results in seconds' },
             { icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, text: '100% free to use' },
           ].map(item => (
-            <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#2d5474', fontSize: '0.95rem', fontWeight: 600 }}>
+              <div key={item.text} className="gs-chip" style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#2d5474', fontSize: '0.95rem', fontWeight: 600 }}>
+
               <span style={{ color: '#0ea5e9' }}>{item.icon}</span>
               <span>{item.text}</span>
             </div>

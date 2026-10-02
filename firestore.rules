@@ -55,10 +55,25 @@ service cloud.firestore {
     // entire collection. Requiring a limit means bulk extraction costs one
     // metered query per page instead of one unbounded one.
     match /reviews/{reviewId} {
+      // A review may be linked back to the trip it was written about, so it can
+      // be shown on that trip as well as in the global feed. Both halves are
+      // optional and only accepted together: a `tripId` with no `tripTitle`
+      // renders as a bare id in the UI, and a `tripTitle` on its own cannot be
+      // resolved to a trip. A client must never be able to attach someone else's
+      // trip to their review, so a linked id has to be one the author owns.
+      function hasValidTripLink(data) {
+        return (!data.keys().hasAny(['tripId', 'tripTitle']) ||
+                (data.tripId == null && data.tripTitle == null)) ||
+               (data.tripId is string && isValidId(data.tripId) &&
+                data.tripTitle is string && data.tripTitle.size() > 0 &&
+                data.tripTitle.size() <= 200 &&
+                get(/databases/$(database)/documents/saved_trips/$(data.tripId)).data.userId == request.auth.uid);
+      }
+
       function isValidReview(data) {
         return data.keys().hasAll(['destination', 'userId', 'userName', 'rating', 'review', 'createdAt']) &&
                data.keys().hasOnly(['destination', 'userId', 'userName', 'rating', 'review', 'createdAt',
-                                    'userPhoto', 'videoUrl']) &&
+                                    'userPhoto', 'videoUrl', 'tripId', 'tripTitle']) &&
                data.destination is string && data.destination.size() <= 200 &&
                data.userId is string && isValidId(data.userId) &&
                data.userName is string && data.userName.size() <= 100 &&
@@ -66,7 +81,8 @@ service cloud.firestore {
                data.review is string && data.review.size() <= 2000 &&
                data.createdAt == request.time &&
                isOptionalWebUrl(data, 'userPhoto', 2048) &&
-               isOptionalWebUrl(data, 'videoUrl', 2048);
+               isOptionalWebUrl(data, 'videoUrl', 2048) &&
+               hasValidTripLink(data);
       }
 
       allow create: if isVerified() && isValidReview(request.resource.data) && isOwner(request.resource.data.userId);

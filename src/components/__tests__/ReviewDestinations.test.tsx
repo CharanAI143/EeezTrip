@@ -9,6 +9,7 @@ vi.mock('../../lib/firebase', () => ({
   collection: vi.fn(() => ({})),
   query: vi.fn(() => ({})),
   getDocs: vi.fn(),
+  where: vi.fn(),
   orderBy: vi.fn(),
   limit: vi.fn(),
   addDoc: vi.fn(),
@@ -53,6 +54,20 @@ describe('ReviewDestinations query', () => {
 
 describe('ReviewDestinations form validation', () => {
   /**
+   * Opens the review form.
+   *
+   * The control that opens it moves depending on whether the list has anything
+   * in it: the toolbar button reads "Write a review" once there are reviews to
+   * browse, and the empty state's reads "Write the first review". Both open the
+   * same form, so match either rather than pinning the tests to one layout.
+   */
+  async function openReviewForm() {
+    fireEvent.click(
+      await screen.findByRole('button', { name: /write (a|the first) review/i })
+    );
+  }
+
+  /**
    * Submits via the form element rather than clicking the button: the video
    * field is type="url", and jsdom's native constraint validation would reject
    * a javascript: URL before the submit handler ever runs. The point of these
@@ -60,8 +75,7 @@ describe('ReviewDestinations form validation', () => {
    */
   async function submitWithVideoUrl(videoUrl: string) {
     const { container } = renderComponent({ user });
-    await screen.findByRole('button', { name: /share experience/i });
-    fireEvent.click(screen.getByRole('button', { name: /share experience/i }));
+    await openReviewForm();
 
     fireEvent.change(screen.getByPlaceholderText(/youtube\.com/i), {
       target: { value: videoUrl },
@@ -94,8 +108,7 @@ describe('ReviewDestinations form validation', () => {
 
   it('rejects a review over the 2000 character limit the rule enforces', async () => {
     const { container } = renderComponent({ user });
-    await screen.findByRole('button', { name: /share experience/i });
-    fireEvent.click(screen.getByRole('button', { name: /share experience/i }));
+    await openReviewForm();
 
     fireEvent.change(screen.getByPlaceholderText(/describe your journey/i), {
       target: { value: 'a'.repeat(2001) },
@@ -120,5 +133,102 @@ describe('ReviewDestinations form validation', () => {
       expect.objectContaining({ videoUrl: 'https://youtube.com/watch?v=abc' })
     );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('writes both halves of the trip link together', async () => {
+    // firestore.rules rejects a tripId without a tripTitle, so the two fields
+    // have to travel as a pair or the write is denied as a permission error.
+    //
+    // getDocs serves two collections here, so each call gets its own answer: the
+    // reviews read that runs first, then the signed-in traveller's saved trips.
+    mockGetDocs
+      .mockResolvedValueOnce({ docs: [] } as never)
+      .mockResolvedValueOnce({
+        docs: [
+          { id: 'trip-abc', data: () => ({ title: 'Goa in December', destination: 'Goa', userId: 'user-123' }) },
+        ],
+      } as never);
+
+    const { container } = renderComponent({ user });
+    await openReviewForm();
+
+    const linkSelect = await screen.findByRole('combobox', { name: /link to one of your trips/i });
+    fireEvent.change(linkSelect, { target: { value: 'trip-abc' } });
+
+    fireEvent.change(screen.getByPlaceholderText(/describe your journey/i), {
+      target: { value: 'The beaches were empty and the food was extraordinary.' },
+    });
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+    await waitFor(() => expect(mockAddDoc).toHaveBeenCalled());
+    expect(mockAddDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tripId: 'trip-abc', tripTitle: 'Goa in December' })
+    );
+  });
+
+  it('writes a null trip link when no trip is chosen', async () => {
+    // The rules treat a missing field and a null one the same way, but the old
+    // payload omitted the keys entirely. Being explicit keeps the stored shape
+    // identical whether or not a trip was linked.
+    mockGetDocs.mockResolvedValue({ docs: [] } as never);
+
+    const { container } = renderComponent({ user });
+    await openReviewForm();
+
+    fireEvent.change(screen.getByPlaceholderText(/describe your journey/i), {
+      target: { value: 'Worth it.' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/kyoto, japan/i), { target: { value: 'Goa' } });
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+    await waitFor(() => expect(mockAddDoc).toHaveBeenCalled());
+    expect(mockAddDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tripId: null, tripTitle: null })
+    );
+  });
+
+  it('does not read a signed-out visitor’s trips', async () => {
+    renderComponent();
+    await waitFor(() => expect(mockGetDocs).toHaveBeenCalled());
+
+    // Only the public reviews collection is read. A query against saved_trips
+    // for a null user would be denied by firestore.rules.
+    expect(vi.mocked(firebase.collection)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(firebase.collection)).toHaveBeenCalledWith({}, 'reviews');
+  });
+
+  it('reports the search term upward so the page can match it', async () => {
+    const onSearch = vi.fn();
+    render(
+      <ReviewDestinations user={null} onLogin={vi.fn()} onSearch={onSearch} />
+    );
+
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith(''));
+    fireEvent.change(screen.getByPlaceholderText(/search a destination/i), {
+      target: { value: 'Kyoto' },
+    });
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith('Kyoto'));
+  });
+
+  it('surfaces a failed post instead of silently doing nothing', async () => {
+    // The old catch let the rejection escape as an unhandled promise, so a failed
+    // write looked exactly like a button that does nothing.
+    mockGetDocs.mockResolvedValue({ docs: [] } as never);
+    mockAddDoc.mockRejectedValue(new Error('permission-denied') as never);
+
+    const { container } = renderComponent({ user });
+    await openReviewForm();
+
+    fireEvent.change(screen.getByPlaceholderText(/describe your journey/i), {
+      target: { value: 'Worth it.' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/kyoto, japan/i), { target: { value: 'Goa' } });
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/could not post your review/i)
+    );
   });
 });

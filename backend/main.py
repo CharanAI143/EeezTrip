@@ -1450,31 +1450,34 @@ async def get_group_sync(session_id: str):
 
 # ── Reviews ────────────────────────────────────────────────────────────────────
 
-class ReviewRequest(BaseModel):
-    user_id: str = "anonymous"
-    destination: str
-    rating: int
-    comment: str
-    video_url: Optional[str] = None
+# Traveller-written reviews live in Firestore, written directly by the client and
+# policed by firestore.rules. They are not proxied through this backend: that
+# would mean a second store to keep in sync with the rules, and a server-side
+# write would have to re-implement the ownership and immutability checks the
+# rules already enforce atomically.
+#
+# What this endpoint serves is the other half — Google reviews aggregated for
+# signed-out visitors, who have no access to the Firestore user collections.
 
-@app.post("/api/reviews", status_code=201)
-async def create_review(body: ReviewRequest):
-    """Save a review record."""
-    db = get_db()
-    doc = {
-        **body.model_dump(),
-        "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+@app.get("/api/reviews/external")
+async def external_reviews(destination: str):
+    """Aggregate a destination's Google reviews via SerpApi.
+
+    Always answers 200. A signed-out visitor sees no third-party reviews, which
+    is a thinner page, but an outage or a missing API key must not turn the
+    reviews page into an error.
+    """
+    from backend.app.providers.live_data.reviews_provider import GoogleReviewsProvider
+
+    destination = destination.strip()
+    if not destination:
+        return {"destination": "", "reviews": [], "count": 0, "source": "google"}
+
+    provider = GoogleReviewsProvider()
+    reviews = provider.reviews_for(destination)
+    return {
+        "destination": destination,
+        "reviews": reviews,
+        "count": len(reviews),
+        "source": "google",
     }
-    result = await db.reviews.insert_one(doc)
-    return {"id": str(result.inserted_id), "message": "Review submitted successfully."}
-
-@app.get("/api/reviews")
-async def list_reviews(destination: Optional[str] = None):
-    """List reviews, optionally filtering by destination."""
-    db = get_db()
-    query = {"destination": destination} if destination else {}
-    cursor = db.reviews.find(query).sort("created_at", -1)
-    reviews = []
-    async for doc in cursor:
-        reviews.append(_id_to_str(doc))
-    return {"reviews": reviews, "count": len(reviews)}

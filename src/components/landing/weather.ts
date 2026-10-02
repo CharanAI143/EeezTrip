@@ -343,15 +343,6 @@ export function resolveTimeOfDay(date: Date): TimeOfDay {
   return isDaytime(date) ? 'day' : 'night';
 }
 
-/**
- * The season shown for the first frame, before the region is known.
- *
- * The monsoon rather than "today", because the hero is an Indian travel product
- * and there is no reason to flash a foreign season while the timezone is being
- * read. The mount effect then replaces this with the reader's real season.
- */
-export const DEFAULT_SEASON: Season = 'monsoon';
-
 /** Every region, for a picker. */
 export const REGION_OPTIONS: ReadonlyArray<{ id: Region; label: string; climate: Climate }> = [
   { id: 'southAsia', label: 'South Asia', climate: 'tropicalMonsoon' },

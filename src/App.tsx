@@ -11,10 +11,16 @@ import ResultsPage from './pages/ResultsPage';
 import BookingPage from './pages/BookingPage';
 import DashboardPage from './pages/DashboardPage';
 import ReviewsPage from './pages/ReviewsPage';
+import AuthPage from './pages/AuthPage';
 import { ChatBot } from './components/chatbot/ChatBot';
 
 function AppRouter() {
   const { state } = useTripStore();
+
+  // The assistant is a trip-planning tool, so it stays out of the pages that are
+  // about reading and writing rather than planning. On reviews it competed with
+  // the review composer for the bottom-right corner and could cover a card.
+  const showChatBot = state.page !== 'reviews';
 
   const pageMap = {
     landing: <LandingPage />,
@@ -27,6 +33,7 @@ function AppRouter() {
     booking: <BookingPage />,
     dashboard: <DashboardPage />,
     reviews: <ReviewsPage />,
+    auth: <AuthPage />,
   };
 
   return (
@@ -36,7 +43,7 @@ function AppRouter() {
       <main className="page-enter" key={state.page}>
         {pageMap[state.page]}
       </main>
-      <ChatBot />
+      {showChatBot && <ChatBot />}
     </div>
   );
 }

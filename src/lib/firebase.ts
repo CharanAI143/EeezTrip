@@ -1,5 +1,16 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  OAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+  signInWithPopup,
+  signOut,
+  type Auth,
+} from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit, serverTimestamp, Timestamp, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -24,6 +35,7 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
+let microsoftProvider: OAuthProvider | null = null;
 
 if (isFirebaseConfigured) {
   try {
@@ -31,12 +43,20 @@ if (isFirebaseConfigured) {
     db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
     auth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
+    // Covers Outlook, Hotmail and any other Microsoft consumer/work account.
+    microsoftProvider = new OAuthProvider('microsoft.com');
+    microsoftProvider.setCustomParameters({ prompt: 'select_account' });
+    // Ask for the name too. Without this the account arrives with a display name
+    // but reviews would be filed under "Traveler", and `userName` is required by
+    // firestore.rules.
+    microsoftProvider.addScope('user.read');
   } catch (error) {
     console.error('[firebase] initialisation failed; continuing without it.', error);
     app = null;
     auth = null;
     db = null;
     googleProvider = null;
+    microsoftProvider = null;
   }
 } else {
   console.warn(
@@ -44,21 +64,68 @@ if (isFirebaseConfigured) {
   );
 }
 
-export { isFirebaseConfigured, auth, db, googleProvider };
+export { isFirebaseConfigured, auth, db, googleProvider, microsoftProvider };
 
-export { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
-  orderBy, 
+export {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  orderBy,
   limit,
-  serverTimestamp, 
+  serverTimestamp,
   Timestamp,
   signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
   signOut
 };
+
+/**
+ * Turn a Firebase auth error code into something worth showing a person.
+ *
+ * The raw codes (`auth/wrong-password`, `auth/popup-closed-by-user`) mean nothing
+ * to someone trying to sign in, and the previous code path just logged them, so
+ * a failed sign-in looked like a button that did nothing.
+ */
+export function authErrorMessage(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code: unknown }).code)
+    : '';
+
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'That email address does not look right.';
+    case 'auth/missing-password':
+      return 'Enter your password.';
+    case 'auth/weak-password':
+      return 'Choose a password of at least 6 characters.';
+    case 'auth/email-already-in-use':
+      return 'An account already exists with that email. Sign in instead.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      // Deliberately vague: distinguishing these two tells an attacker which
+      // addresses have accounts.
+      return 'That email and password combination is not correct.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Wait a few minutes and try again.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Sign-in was cancelled.';
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the sign-in popup. Allow popups and try again.';
+    case 'auth/operation-not-allowed':
+      return 'That sign-in method is not enabled for this project yet.';
+    case 'auth/network-request-failed':
+      return 'Could not reach the sign-in service. Check your connection.';
+    default:
+      return 'Something went wrong signing you in. Please try again.';
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',

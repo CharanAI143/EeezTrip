@@ -1,4 +1,4 @@
-import { PlaceImage, Recommendation, TripPreferences } from '../types';
+import { PlaceImage, Recommendation, TripPreferences, ExternalReview } from '../types';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -291,28 +291,21 @@ export async function fetchWeatherAlternatives(
   return res.json();
 }
 
-export async function fetchReviews(destination?: string): Promise<any[]> {
-  const url = destination ? `${BASE}/reviews?destination=${encodeURIComponent(destination)}` : `${BASE}/reviews`;
+/**
+ * Google reviews for a destination, via the backend's SerpApi aggregation.
+ *
+ * Returns an empty list on any failure rather than throwing: this is the
+ * signed-out visitor's view of a destination, and the page has to render with
+ * first-party reviews either way.
+ */
+export async function fetchExternalReviews(destination: string): Promise<ExternalReview[]> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(`${BASE}/reviews/external?destination=${encodeURIComponent(destination)}`);
     if (!res.ok) return [];
     const data = await res.json();
-    return data.reviews || [];
+    return Array.isArray(data.reviews) ? data.reviews : [];
   } catch {
     return [];
-  }
-}
-
-export async function submitReview(review: any): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE}/reviews`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(review),
-    });
-    return res.ok;
-  } catch {
-    return false;
   }
 }
 

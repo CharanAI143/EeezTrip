@@ -1,160 +1,206 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { motion } from 'motion/react';
+import { Loader2, User as UserIcon, Star, Sparkles, WifiOff } from 'lucide-react';
+import { ReviewDestinations } from '../components/ReviewDestinations';
 import { useTripStore } from '../state/tripStore';
-import { fetchReviews, submitReview } from '../api/client';
-import { Review } from '../types';
+import { fetchExternalReviews } from '../api/client';
+import type { ExternalReview } from '../types';
 
-export default function ReviewsPage() {
-  const { state } = useTripStore();
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+function Stars({ rating, size = 13 }: { rating: number; size?: number }) {
+  return (
+    <span className="inline-flex gap-0.5 align-middle" aria-label={`${rating} out of 5`}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star
+          key={s}
+          width={size}
+          height={size}
+          className={rating >= s ? 'text-brand-amber fill-brand-amber' : 'text-brand-border'}
+        />
+      ))}
+    </span>
+  );
+}
 
-  // New review form state
-  const [destination, setDestination] = useState('');
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+/**
+ * Google reviews for a destination, for visitors who have not signed in.
+ *
+ * Kept visually and structurally separate from the traveller reviews above: these
+ * are attributed to a place, carry no traveller identity, and are never written by
+ * anyone using the app. Merging them into one list would let a visitor post a
+ * Google quote and pass it off as a fellow traveller's experience.
+ */
+function GoogleReviews({ destination }: { destination: string }) {
+  const [reviews, setReviews] = useState<ExternalReview[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [requested, setRequested] = useState(false);
+
+  const query = destination.trim();
 
   useEffect(() => {
-    loadReviews();
-  }, []);
-
-  const loadReviews = async () => {
-    setLoading(true);
-    const data = await fetchReviews();
-    setReviews(data);
-    setLoading(false);
-  };
-
-  const handleAddReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!destination || !comment) return;
-    setSubmitting(true);
-    
-    const newReview = {
-      user_id: state.user?.uid || 'anonymous',
-      destination,
-      rating,
-      comment,
-      video_url: videoUrl || null,
-    };
-
-    const success = await submitReview(newReview);
-    if (success) {
-      setDestination('');
-      setRating(5);
-      setComment('');
-      setVideoUrl('');
-      loadReviews();
+    if (!query) {
+      setReviews([]);
+      setRequested(false);
+      setLoading(false);
+      return;
     }
-    setSubmitting(false);
-  };
+
+    let cancelled = false;
+    setLoading(true);
+    setRequested(true);
+
+    fetchExternalReviews(query)
+      .then(data => {
+        if (!cancelled) setReviews(data);
+      })
+      .catch(() => {
+        if (!cancelled) setReviews([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  const summary = useMemo(() => {
+    const rated = reviews.map(r => r.rating).filter((r): r is number => typeof r === 'number');
+    const average = rated.length ? rated.reduce((sum, r) => sum + r, 0) / rated.length : null;
+    const total = reviews.find(r => r.totalReviews != null)?.totalReviews ?? null;
+    return { average, total };
+  }, [reviews]);
+
+  if (!query) return null;
 
   return (
-    <div style={{ padding: '120px 24px 80px', maxWidth: 1000, margin: '0 auto', minHeight: '100vh' }}>
-      <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '2.5rem', fontWeight: 900, color: '#0c1b33', margin: '0 0 16px' }}>
-          Traveler <span className="text-gradient-duo">Reviews</span>
-        </h1>
-        <p style={{ color: '#64748b', fontSize: '1.1rem' }}>
-          See what others are saying about their trips, and share your own experiences!
-        </p>
+    <section className="mt-20" aria-labelledby="google-reviews-heading">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-2">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-coral mb-1.5">
+            From Google
+          </p>
+          <h2 id="google-reviews-heading" className="text-2xl font-black text-brand-navy">
+            What travellers say about {query}
+          </h2>
+        </div>
+        {summary.average != null && (
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white/80 border border-brand-border rounded-2xl shadow-sm">
+            <span className="text-2xl font-black text-brand-navy tabular-nums leading-none">
+              {summary.average.toFixed(1)}
+            </span>
+            <div>
+              <Stars rating={Math.round(summary.average)} size={14} />
+              {summary.total != null && (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-muted mt-0.5">
+                  {summary.total.toLocaleString()} Google reviews
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div style={{ display: 'grid', gap: 32, gridTemplateColumns: '1fr 350px', alignItems: 'start' }}>
-        
-        {/* Reviews List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Loading reviews...</div>
-          ) : reviews.length === 0 ? (
-            <div className="glass" style={{ padding: 40, textAlign: 'center', borderRadius: 20 }}>
-              No reviews yet. Be the first to share!
-            </div>
-          ) : (
-            reviews.map((r, i) => (
-              <div key={r.id || i} className="glass anim-fade-up" style={{ padding: 24, borderRadius: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0c1b33' }}>{r.destination}</div>
-                  <div style={{ color: '#eab308', letterSpacing: 2 }}>
-                    {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
-                  </div>
-                </div>
-                <p style={{ color: '#334155', lineHeight: 1.6, marginBottom: 16 }}>"{r.comment}"</p>
-                
-                {r.video_url && (
-                  <div style={{ marginTop: 16, borderRadius: 12, overflow: 'hidden', background: '#000', width: '100%', maxWidth: 400 }}>
-                    <video controls src={r.video_url} style={{ width: '100%', display: 'block' }} />
-                  </div>
-                )}
-                
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 16 }}>
-                  Posted on {r.created_at ? new Date(r.created_at).toLocaleDateString() : 'recently'}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+      <p className="text-xs text-brand-muted mb-6">
+        Collected from Google, not written by other EeezTrip travellers.
+      </p>
 
-        {/* Add Review Form */}
-        <div className="glass" style={{ padding: 24, borderRadius: 20, position: 'sticky', top: 100 }}>
-          <h3 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.4rem', fontWeight: 800, color: '#0c1b33', marginBottom: 20 }}>
-            Add a Review
-          </h3>
-          <form onSubmit={handleAddReview} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>Destination</label>
-              <input 
-                type="text" 
-                required 
-                value={destination} 
-                onChange={e => setDestination(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', outline: 'none' }}
-                placeholder="e.g. Paris"
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>Rating (1-5)</label>
-              <select 
-                value={rating} 
-                onChange={e => setRating(Number(e.target.value))}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', outline: 'none' }}
-              >
-                {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} Stars</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>Comment</label>
-              <textarea 
-                required 
-                value={comment} 
-                onChange={e => setComment(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', outline: 'none', minHeight: 80, resize: 'vertical' }}
-                placeholder="How was your trip?"
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>Video URL (Optional)</label>
-              <input 
-                type="url" 
-                value={videoUrl} 
-                onChange={e => setVideoUrl(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', outline: 'none' }}
-                placeholder="https://..."
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={submitting}
-              className="btn btn-primary" 
-              style={{ width: '100%', padding: '12px', marginTop: 8 }}
+      {loading ? (
+        <div className="flex items-center gap-3 px-6 py-8 bg-white/70 border border-brand-border rounded-2xl text-sm font-semibold text-brand-muted">
+          <Loader2 className="w-5 h-5 animate-spin text-brand-coral" />
+          Looking up what travellers said about {query}...
+        </div>
+      ) : !requested ? null : reviews.length === 0 ? (
+        <div className="flex items-center gap-3 px-6 py-6 bg-white/70 border border-dashed border-brand-border rounded-2xl text-sm text-brand-muted">
+          <WifiOff className="w-4 h-4 shrink-0" />
+          No Google reviews available for {query} right now.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {reviews.map((review, i) => (
+            <motion.article
+              key={`${review.author}-${i}`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.04, 0.3) }}
+              className="min-w-0 bg-white/70 backdrop-blur border border-brand-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow"
             >
-              {submitting ? 'Submitting...' : 'Submit Review'}
-            </button>
-          </form>
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-sand to-brand-blush/40 flex items-center justify-center shrink-0">
+                    <UserIcon className="w-4 h-4 text-brand-muted" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-brand-navy text-sm leading-tight truncate">
+                      {review.author}
+                    </p>
+                    {review.visitedAt && (
+                      <p className="text-[10px] uppercase tracking-widest text-brand-muted font-bold">
+                        Visited {review.visitedAt}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {review.rating != null && <Stars rating={Math.round(review.rating)} />}
+              </div>
+              {/* A left border, not an inline quote glyph. The glyph was an inline
+                  SVG on the text baseline with a negative top margin, so its ink —
+                  already high in the viewBox — sat above the first line and read as
+                  breaking out of the card. This also matches how the traveller
+                  review cards quote their text. */}
+              {/* break-words: Google reviews routinely contain bare URLs, and a long
+                  unbreakable token would otherwise widen the whole grid past the
+                  page's max width. */}
+              <p className="text-sm text-brand-slate leading-relaxed break-words border-l-[3px] border-brand-coral/40 pl-4">
+                {review.text}
+              </p>
+              {review.placeName && (
+                <p className="mt-3 pt-3 border-t border-brand-border text-[10px] uppercase tracking-widest text-brand-muted font-bold truncate">
+                  {review.placeName}
+                </p>
+              )}
+            </motion.article>
+          ))}
         </div>
+      )}
+    </section>
+  );
+}
 
-      </div>
+export default function ReviewsPage() {
+  const { state, navigate } = useTripStore();
+  // `search` is written by ReviewDestinations' search box and read by GoogleReviews.
+  // The indirection is the point: one query drives both the traveller reviews and
+  // the Google lookup, so a reader looking for "Goa" sees community reports and
+  // independent ones from a single term instead of two competing inputs.
+  const [search, setSearch] = useState('');
+
+  const onSearch = (term: string) => setSearch(term);
+
+  return (
+    <div className="page-offset-nav w-full max-w-6xl mx-auto px-6 pb-24">
+      <header className="text-center mb-12">
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-brand-coral bg-white/70 border border-brand-border rounded-full px-4 py-1.5 mb-5"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Traveller reports
+        </motion.p>
+        <h1 className="font-head text-4xl sm:text-5xl font-black text-brand-navy mb-4">
+          What the trip <span className="text-gradient-duo">actually</span> felt like
+        </h1>
+        <p className="text-brand-muted text-lg max-w-xl mx-auto leading-relaxed">
+          {state.user
+            ? 'Add a review to your trip, and read what other travellers reported on the ground.'
+            : 'Search any destination for independent Google reviews, and sign in to add what you found.'}
+        </p>
+      </header>
+
+      <ReviewDestinations user={state.user} onLogin={() => navigate('auth')} onSearch={onSearch} />
+
+      <GoogleReviews destination={search} />
     </div>
   );
 }

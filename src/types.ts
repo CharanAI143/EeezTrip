@@ -73,18 +73,50 @@ export type PlaceImage = {
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
-export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'mood-destination' | 'preferences' | 'results' | 'booking' | 'dashboard' | 'reviews';
+export type Page = 'landing' | 'choice' | 'start' | 'mood-start' | 'mood-destination' | 'preferences' | 'results' | 'booking' | 'dashboard' | 'reviews' | 'auth';
 
 // ─── Database Records ───────────────────────────────────────────────────────
 
-export type Review = {
-  id?: string;
-  user_id?: string;
+/**
+ * A review written by a signed-in traveller, stored in Firestore.
+ *
+ * `tripId`/`tripTitle` are what connect a review back to the trip it was
+ * written about, so a review can be surfaced on that trip rather than only in
+ * the global feed. Both are optional: a traveller can review a destination they
+ * visited outside the app.
+ */
+export type DestinationReview = {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string | null;
   destination: string;
   rating: number;
-  comment: string;
-  video_url?: string | null;
-  created_at?: string;
+  review: string;
+  videoUrl?: string | null;
+  tripId?: string | null;
+  tripTitle?: string | null;
+  createdAt?: FirestoreTimestamp;
+};
+
+/**
+ * A review aggregated from Google via the backend, shown to signed-out visitors.
+ *
+ * Deliberately a different shape from `DestinationReview`: it is read-only,
+ * carries no `userId`, and is attributed to a place rather than a person, so it
+ * can never be mistaken for something a traveller wrote.
+ */
+export type ExternalReview = {
+  author: string;
+  rating: number | null;
+  text: string;
+  /** When the reviewer visited, as reported by Google. Often relative, e.g. "2 years ago". */
+  visitedAt?: string | null;
+  /** How many reviews the place has in total, when Google reports it. */
+  totalReviews?: number | null;
+  /** Average rating across all of the place's Google reviews. */
+  averageRating?: number | null;
+  placeName: string;
 };
 
 export type TripRecord = {
@@ -132,18 +164,6 @@ export type SavedTrip = {
   title: string;
   destination: string;
   content: string;
-  createdAt?: FirestoreTimestamp;
-};
-
-export type DestinationReview = {
-  id: string;
-  userId: string;
-  userName: string;
-  userPhoto?: string | null;
-  destination: string;
-  rating: number;
-  review: string;
-  videoUrl?: string | null;
   createdAt?: FirestoreTimestamp;
 };
 

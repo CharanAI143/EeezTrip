@@ -24,6 +24,7 @@ import {
   resolveWeather,
   SEASON_WEATHER,
 } from '../../components/landing/weather';
+import { createInitialState } from '../../components/landing/LandingPageProvider';
 
 /** Build a date in a given month (0-indexed) so the calendar is explicit. */
 const monthDate = (month: number) => new Date(2026, month, 15);
@@ -527,6 +528,33 @@ describe('Seasonal weather layer', () => {
     expect(page.dataset.weather).toBe('wind');
     expect(document.querySelector('.weather-wind-streak')).not.toBeNull();
     expect(document.querySelector('.weather-drop')).toBeNull();
+  });
+
+  it('builds the first frame from the real season, not a hardcoded default', () => {
+    // The page used to paint a hardcoded monsoon first frame and then correct it
+    // from a mount effect, so every launch visibly opened on falling rain and
+    // swapped to the reader's real effect a frame later. The first frame is
+    // resolved up front instead, which these assertions pin.
+    stubTimeZone('Asia/Kolkata');
+    vi.setSystemTime(monthDate(9));
+
+    const launch = createInitialState();
+    expect(launch.season).toBe('postMonsoon');
+    expect(launch.weather).toBe('wind');
+
+    // And it is still the calendar doing the work, not a different hardcode.
+    vi.setSystemTime(monthDate(6));
+    expect(createInitialState().weather).toBe('rain');
+
+    // A reader with no readable timezone falls back to the India-first default
+    // region rather than to a hardcoded season.
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => {
+      throw new Error('Intl unavailable');
+    });
+    vi.setSystemTime(monthDate(9));
+    const fallback = createInitialState();
+    expect(fallback.region).toBe('southAsia');
+    expect(fallback.season).toBe('postMonsoon');
   });
 
   it('renders wind as streaks and dust rather than solid shapes', () => {

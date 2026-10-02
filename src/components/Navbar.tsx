@@ -1,7 +1,7 @@
 import { useTripStore } from '../state/tripStore';
 import { Page } from '../types';
-import { useState } from 'react';
-import { signInWithPopup, googleProvider, auth, signOut } from '../lib/firebase';
+import { useState, useLayoutEffect, useRef } from 'react';
+import { signOut, auth } from '../lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const BASE_LINKS: { page: Page; label: string }[] = [
@@ -21,6 +21,9 @@ const PAGE_PROGRESS: Record<Page, number> = {
   booking: 100,
   dashboard: 75,
   reviews: 20,
+  // Sign-in is not a step in planning a trip, so it shows a neutral sliver of
+  // progress rather than implying the reader is partway through.
+  auth: 0,
 };
 
 const PLANE_SVG = (
@@ -33,18 +36,38 @@ export default function Navbar() {
   const { state, navigate } = useTripStore();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const progress = PAGE_PROGRESS[state.page];
+  const headerRef = useRef<HTMLElement>(null);
 
-  const handleSignIn = async () => {
-    if (!auth || !googleProvider) {
-      console.warn("Sign-in is unavailable: Firebase is not configured.");
-      return;
+  // This header is fixed, so every page has to reserve exactly its height or the
+  // first block of content sits underneath it. The height is not a constant: the
+  // nav is a single flex row, so on a narrow viewport the links and CTA wrap
+  // *inside* their buttons and the bar grows. Publishing the measured height as
+  // `--nav-h` lets pages offset by the truth rather than a guessed constant that
+  // silently goes stale at other viewport widths.
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const publish = () => {
+      document.documentElement.style.setProperty('--nav-h', `${el.offsetHeight}px`);
+    };
+    publish();
+    // jsdom has no ResizeObserver, so a test that mounts this would throw on
+    // construction. Fall back to the resize event, which is the bulk of what the
+    // observer is reacting to anyway.
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', publish);
+      return () => window.removeEventListener('resize', publish);
     }
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (e) {
-      console.error("Login failed", e);
-    }
-  };
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Sign-in lives on its own page now, so that Google, Outlook and email are
+  // reachable from one place. The button used to open a Google popup directly,
+  // which made the other two providers impossible to offer and gave a failed
+  // sign-in nowhere to report itself.
+  const handleSignIn = () => navigate('auth');
 
   const handleSignOut = async () => {
     if (!auth) return;
@@ -58,7 +81,7 @@ export default function Navbar() {
   };
 
   return (
-    <header style={{
+    <header ref={headerRef} style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -71,6 +94,14 @@ export default function Navbar() {
         margin: '0 auto',
         display: 'flex',
         alignItems: 'center',
+        /* The labels below are nowrap so they cannot stack into a taller bar.
+           Without a wrap here that trades a height problem for a horizontal one:
+           the nav needs ~650px, so on a phone it pushed the fixed header wider
+           than the viewport and dragged the page sideways. Wrapping moves whole
+           items onto the next row instead — and `--nav-h` then reports the extra
+           height, so pages still clear it. */
+        flexWrap: 'wrap',
+        rowGap: 10,
         justifyContent: 'space-between',
         background: 'rgba(240,249,255,0.82)',
         border: '1px solid rgba(186,230,253,0.7)',
@@ -120,7 +151,7 @@ export default function Navbar() {
         </button>
 
         {/* Nav links */}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           {(() => {
             const navLinks = [...BASE_LINKS];
             if (state.preferences.destination.trim().length > 0) {
@@ -146,6 +177,9 @@ export default function Navbar() {
                   borderRadius: 999,
                   padding: '11px 16px',
                   minHeight: 44,
+                  /* Without this the label wraps inside the button on narrow
+                     viewports, which grows the fixed bar over the page content. */
+                  whiteSpace: 'nowrap',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
@@ -234,6 +268,7 @@ export default function Navbar() {
                 color: '#fff', background: '#0f172a',
                 border: 'none', borderRadius: 999,
                 padding: '8px 20px', minHeight: 44, cursor: 'pointer',
+                whiteSpace: 'nowrap',
                 transition: 'background 0.2s',
               }}
               onMouseEnter={e => e.currentTarget.style.background = '#334155'}

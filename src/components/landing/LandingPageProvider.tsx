@@ -17,8 +17,6 @@ import {
   type SectionId,
 } from './landingContent';
 import {
-  DEFAULT_REGION,
-  DEFAULT_SEASON,
   detectRegion,
   REGION_OPTIONS,
   resolveSeason,
@@ -98,23 +96,6 @@ export type LandingState = {
   weather: WeatherKind;
 };
 
-/** The region and its derived season/weather before the browser reports a timezone. */
-function initialWeatherState(): Pick<
-  LandingState,
-  'region' | 'timeZone' | 'timeOfDay' | 'timeOfDayPinned' | 'season' | 'weather'
-> {
-  return {
-    region: DEFAULT_REGION,
-    timeZone: null,
-    // Day, not the clock: the first frame is the lighter theme, which is the
-    // safer default to paint briefly than a dark page.
-    timeOfDay: 'day',
-    timeOfDayPinned: false,
-    season: DEFAULT_SEASON,
-    weather: SEASON_WEATHER[DEFAULT_SEASON],
-  };
-}
-
 /** The browser's IANA timezone, or null where Intl is unavailable. */
 function browserTimeZone(): string | null {
   try {
@@ -136,18 +117,44 @@ function parseRegion(value: unknown): Region | null {
   return typeof value === 'string' && known.has(value) ? (value as Region) : null;
 }
 
-const initialState: LandingState = {
-  heroStep: 0,
-  heroPlaying: true,
-  heroSwapMs: HERO_SWAP_MS,
-  flipDelayMs: FLIP_DELAY_MS,
-  flipped: null,
-  flipOwner: null,
-  activeSection: SECTION_IDS.hero,
-  scrollProgress: 0,
-  reducedMotion: false,
-  ...initialWeatherState(),
-};
+/**
+ * The state the page's very first frame is built from.
+ *
+ * The timezone is readable synchronously, so the reader's real region, season
+ * and effect are all resolvable before anything paints. This used to hardcode a
+ * monsoon first frame and correct it from a mount effect, which meant every
+ * launch opened on falling rain and then visibly swapped to the real weather -
+ * an October reader in India watched it change to wind. Resolving it here means
+ * the page opens directly on the effect it was always going to settle on.
+ *
+ * Passed to `useReducer` as an initializer rather than built at module scope, so
+ * `Intl` is still only touched once, on mount.
+ */
+export function createInitialState(): LandingState {
+  const timeZone = browserTimeZone();
+  const region = detectRegion();
+  const season = resolveSeason(new Date(), region, timeZone);
+
+  return {
+    heroStep: 0,
+    heroPlaying: true,
+    heroSwapMs: HERO_SWAP_MS,
+    flipDelayMs: FLIP_DELAY_MS,
+    flipped: null,
+    flipOwner: null,
+    activeSection: SECTION_IDS.hero,
+    scrollProgress: 0,
+    reducedMotion: false,
+    region,
+    timeZone,
+    // Day, not the clock: the first frame is the lighter theme, which is the
+    // safer default to paint briefly than a dark page.
+    timeOfDay: 'day',
+    timeOfDayPinned: false,
+    season,
+    weather: SEASON_WEATHER[season],
+  };
+}
 
 type Action =
   | { type: 'HERO_ADVANCE' }
@@ -204,6 +211,12 @@ function reducer(state: LandingState, action: Action): LandingState {
       // is, so both are recomputed together. Any manually chosen season is
       // dropped, because keeping it would freeze the page into a season that
       // contradicts the region it is supposedly themed for.
+      //
+      // Returning the same object when nothing changed matters more than it
+      // looks: the mount effect dispatches the region the first frame was
+      // already built from, so without this guard every launch re-rendered the
+      // page purely to write the same values back.
+      if (state.region === action.region && state.timeZone === action.timeZone) return state;
       const season = resolveSeason(new Date(), action.region, action.timeZone);
       return {
         ...state,
@@ -286,7 +299,7 @@ type LandingContextValue = {
 const LandingContext = createContext<LandingContextValue | null>(null);
 
 export function LandingPageProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
 
   // Dwell timer lives here, next to the flip state it mutates, so a card's
   // timer is owned by the page rather than by whichever card started it.
@@ -311,13 +324,12 @@ export function LandingPageProvider({ children }: { children: ReactNode }) {
   useEffect(() => clearDwell, [clearDwell]);
 
   /**
-   * Theme the weather for wherever the reader actually is, on mount.
+   * Theme the weather for wherever the reader actually is.
    *
-   * This runs after first paint rather than during the initial render because
-   * the timezone has to be read off `Intl`, and doing that in a lazy initial
-   * state would run it on every render. The default-region state stands for the
-   * first frame, so there is no flash of a mismatched season, only one frame
-   * of the default.
+   * The first frame is already built from this, so on a plain mount this
+   * dispatch is a no-op and the reducer returns the same state. It earns its
+   * keep when the signed-in user's stored region arrives, which can genuinely
+   * disagree with the timezone.
    */
   useEffect(() => {
     const timeZone = browserTimeZone();

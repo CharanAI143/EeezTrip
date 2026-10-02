@@ -26,6 +26,8 @@
         "rating": { "type": "number", "description": "Rating from 1 to 5" },
         "review": { "type": "string", "description": "The text of the review" },
         "videoUrl": { "type": "string", "description": "Optional video URL for the review" },
+        "tripId": { "type": "string", "description": "Optional id of the saved_trips doc this review was written about" },
+        "tripTitle": { "type": "string", "description": "Optional title of that trip, denormalised so the review renders without a second read" },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the review was posted" }
       },
       "required": ["destination", "userId", "rating", "review", "createdAt"]
