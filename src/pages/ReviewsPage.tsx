@@ -174,9 +174,27 @@ function GoogleReviews({ destination }: { destination: string }) {
  */
 function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expandedReviews, setExpandedReviews] = useState<Record<string, ExternalReview[]>>({});
   const [loadingReviews, setLoadingReviews] = useState<Record<string, boolean>>({});
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const clearCloseTimeout = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const handleMouseEnter = (index: number) => {
+    clearCloseTimeout();
+    setHoveredIndex(index);
+  };
+
+  const handleMouseLeave = () => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => setHoveredIndex(null), 120);
+  };
 
   const popularDestinations = useMemo(() => [
     { id: 'goa', name: 'Goa', country: 'India', image: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?q=80&w=400&auto=format&fit=crop', rating: 4.6, reviewCount: 125000, tagline: 'Beaches, nightlife & Portuguese heritage' },
@@ -245,8 +263,8 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.06 }}
               className="relative flex-shrink-0 snap-start w-72 md:w-80"
-              onMouseEnter={() => setHoveredIndex(index)}
-              onMouseLeave={() => setHoveredIndex(null)}
+              onMouseEnter={() => handleMouseEnter(index)}
+              onMouseLeave={handleMouseLeave}
             >
               {/* Card */}
               <div className={`relative group bg-white/90 backdrop-blur border border-brand-border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ${hoveredIndex === index ? 'z-10' : ''}`}>
@@ -302,12 +320,13 @@ function PopularDestinationCards({ user }: { user: { uid: string } | null }) {
               style={getPanelStyle(hoveredIndex)}
               className="absolute bg-white/75 backdrop-blur-xl rounded-2xl p-5 overflow-auto z-30 border border-brand-border/30 shadow-2xl pointer-events-auto"
               onMouseEnter={() => {
+                clearCloseTimeout();
                 const dest = popularDestinations[hoveredIndex!];
                 if (!expandedReviews[dest.id]?.length && !loadingReviews[dest.id]) {
                   fetchReviewsForCard(dest.name, dest.id);
                 }
               }}
-              onMouseLeave={() => setHoveredIndex(null)}
+              onMouseLeave={handleMouseLeave}
             >
               {(() => {
                 const dest = popularDestinations[hoveredIndex!];
