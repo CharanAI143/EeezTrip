@@ -25,6 +25,13 @@ type State = {
   user: User | null;
   sessionId: string | null;
   revisionHistory: Array<{ instruction: string; changeSummary?: string; timestamp: string }>;
+  /**
+   * A destination whose review form is waiting to be opened — set when a
+   * visitor asks to review a place with no reviews yet, possibly before the
+   * sign-in round-trip that has to happen first. Living in the store is what
+   * lets it survive navigation to Auth and back.
+   */
+  pendingReviewDestination: string | null;
 };
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -43,6 +50,7 @@ type Action =
   | { type: 'REVISE_ERROR'; error: string }
   | { type: 'SET_USER'; user: User | null }
   | { type: 'SET_SESSION_ID'; sessionId: string }
+  | { type: 'SET_PENDING_REVIEW_DEST'; destination: string | null }
   | { type: 'RESET' };
 
 // ─── Initial State ────────────────────────────────────────────────────────────
@@ -71,6 +79,7 @@ const initialState: State = {
   user: null,
   sessionId: null,
   revisionHistory: [],
+  pendingReviewDestination: null,
 };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -132,6 +141,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, user: action.user };
     case 'SET_SESSION_ID':
       return { ...state, sessionId: action.sessionId };
+    case 'SET_PENDING_REVIEW_DEST':
+      return { ...state, pendingReviewDestination: action.destination };
     case 'RESET':
       return { ...initialState };
     default:

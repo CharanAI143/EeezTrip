@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { db, collection, query, getDocs, where, orderBy, addDoc, serverTimestamp, limit, handleFirestoreError, OperationType } from '../lib/firebase';
 import { User } from 'firebase/auth';
 import { DestinationReview, SavedTrip } from '../types';
@@ -12,6 +12,20 @@ interface ReviewDestinationsProps {
   onLogin: () => void;
   /** Told about every keystroke, so the page can show third-party reviews for the same term. */
   onSearch?: (term: string) => void;
+  /**
+   * Handed the traveller reviews after each fetch, so the page's other
+   * sections (the popular-destination panel, the combined search section)
+   * can show the same list without a second Firestore read.
+   */
+  onReviewsLoaded?: (reviews: DestinationReview[]) => void;
+  /**
+   * A destination whose review form should open prefilled — set when the
+   * visitor asked to review a place that had no reviews yet, possibly before
+   * a sign-in round-trip. Consumed once via `onOpened`.
+   */
+  openFor?: string | null;
+  /** Called after the prefilled form has been opened, so the caller can clear the pending destination. */
+  onOpened?: () => void;
 }
 
 /** Mirrors the URL check in firestore.rules so bad input fails fast and legibly. */
@@ -76,7 +90,7 @@ function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
   );
 }
 
-export function ReviewDestinations({ user, onLogin, onSearch }: ReviewDestinationsProps) {
+export function ReviewDestinations({ user, onLogin, onSearch, onReviewsLoaded, openFor, onOpened }: ReviewDestinationsProps) {
   const [reviews, setReviews] = useState<DestinationReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,6 +121,7 @@ export function ReviewDestinations({ user, onLogin, onSearch }: ReviewDestinatio
         ...doc.data()
       })) as DestinationReview[];
       setReviews(fetched);
+      onReviewsLoaded?.(fetched);
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, path);
     } finally {
@@ -122,6 +137,25 @@ export function ReviewDestinations({ user, onLogin, onSearch }: ReviewDestinatio
   useEffect(() => {
     onSearch?.(searchTerm);
   }, [searchTerm, onSearch]);
+
+  /**
+   * Open the form for a destination that asked to be reviewed "later" —
+   * typically a place with no reviews at all, where the visitor had to sign in
+   * first. Prefill only when the form is closed, so a half-written review the
+   * traveller already has open is never clobbered.
+   */
+  const formOpenRef = useRef(showAddReview);
+  formOpenRef.current = showAddReview;
+  useEffect(() => {
+    if (!openFor) return;
+    if (!formOpenRef.current) setDest(openFor);
+    setShowAddReview(true);
+    // Next frame: the form does not exist in the DOM until showAddReview renders.
+    requestAnimationFrame(() => {
+      document.getElementById('review-form')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    });
+    onOpened?.();
+  }, [openFor, onOpened]);
 
   /**
    * Load the signed-in traveller's saved trips so a review can be attached to one.
@@ -299,6 +333,7 @@ export function ReviewDestinations({ user, onLogin, onSearch }: ReviewDestinatio
             className="overflow-hidden"
           >
             <form
+              id="review-form"
               onSubmit={handleSubmitReview}
               className="bg-white/90 backdrop-blur rounded-3xl border border-brand-border shadow-xl shadow-brand-border/40 overflow-hidden"
             >

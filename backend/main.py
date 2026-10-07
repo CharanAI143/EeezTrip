@@ -1456,28 +1456,99 @@ async def get_group_sync(session_id: str):
 # write would have to re-implement the ownership and immutability checks the
 # rules already enforce atomically.
 #
-# What this endpoint serves is the other half — Google reviews aggregated for
-# signed-out visitors, who have no access to the Firestore user collections.
+# What this endpoint serves is the other half — third-party reviews (Google,
+# Tripadvisor, MakeMyTrip, Booking.com) aggregated for signed-out visitors,
+# who have no access to the Firestore user collections.
 
 @app.get("/api/reviews/external")
 async def external_reviews(destination: str):
-    """Aggregate a destination's Google reviews via SerpApi.
+    """Aggregate a destination's reviews from every third-party source.
 
-    Always answers 200. A signed-out visitor sees no third-party reviews, which
-    is a thinner page, but an outage or a missing API key must not turn the
-    reviews page into an error.
+    Always answers 200. Each source is fetched independently and concurrently;
+    one source being down, unkeyed or simply without reviews for this place
+    removes only that source from the response. A signed-out visitor with no
+    third-party reviews at all sees a thinner page, but an outage must not turn
+    the reviews page into an error.
     """
-    from backend.app.providers.live_data.reviews_provider import GoogleReviewsProvider
+    import asyncio
+
+    from backend.app.providers.live_data.reviews_provider import (
+        GoogleReviewsProvider,
+        last_fetch_failed as google_fetch_failed,
+    )
+    from backend.app.providers.live_data.tripadvisor_reviews_provider import (
+        TripadvisorReviewsProvider,
+        last_fetch_failed as tripadvisor_fetch_failed,
+    )
+    from backend.app.providers.live_data.web_reviews_provider import (
+        WebReviewProvider,
+        last_fetch_failed as web_fetch_failed,
+    )
 
     destination = destination.strip()
     if not destination:
-        return {"destination": "", "reviews": [], "count": 0, "source": "google"}
+        return {
+            "destination": "",
+            "reviews": [],
+            "sources": {},
+            "links": {},
+            "count": 0,
+            "failed": [],
+            "source": "aggregated",
+        }
 
-    provider = GoogleReviewsProvider()
-    reviews = provider.reviews_for(destination)
+    google = GoogleReviewsProvider()
+    tripadvisor = TripadvisorReviewsProvider()
+    web = WebReviewProvider()
+
+    # Each provider is synchronous (requests under the hood) and cached; run
+    # them off the event loop so a slow SerpApi response cannot stall every
+    # other coroutine, and run them together so the visitor waits one round
+    # trip rather than four.
+    google_reviews, tripadvisor_reviews, mmt_reviews, booking_reviews = await asyncio.gather(
+        asyncio.to_thread(google.reviews_for, destination),
+        asyncio.to_thread(tripadvisor.reviews_for, destination),
+        asyncio.to_thread(web.reviews_for, destination, "makemytrip"),
+        asyncio.to_thread(web.reviews_for, destination, "booking"),
+    )
+
+    sources = {
+        "google": google_reviews,
+        "tripadvisor": tripadvisor_reviews,
+        "makemytrip": mmt_reviews,
+        "booking": booking_reviews,
+    }
+    reviews = [review for group in sources.values() for review in group]
+
+    # Sources that errored rather than answered. Without this the visitor is
+    # told "no reviews yet, be the first" about a city with thousands — an
+    # outage wearing the costume of an empty page.
+    failed = [
+        name
+        for name, failed_now in (
+            ("google", google_fetch_failed(destination)),
+            ("tripadvisor", tripadvisor_fetch_failed(destination)),
+            ("makemytrip", web_fetch_failed(destination, "makemytrip")),
+            ("booking", web_fetch_failed(destination, "booking")),
+        )
+        if failed_now
+    ]
+
+    links = {
+        "google": "https://www.google.com/maps/search/?api=1&query=" + quote(destination),
+        "makemytrip": web.link_for(destination, "makemytrip"),
+        "booking": web.link_for(destination, "booking"),
+        # Only present once Tripadvisor's search has resolved a place; when it
+        # has not, the key is dropped rather than offering a wrong link.
+        "tripadvisor": tripadvisor.link_for(destination),
+    }
+
     return {
         "destination": destination,
         "reviews": reviews,
+        "sources": sources,
+        "links": {k: v for k, v in links.items() if v},
         "count": len(reviews),
-        "source": "google",
+        "failed": failed,
+        "source": "aggregated",
     }

@@ -30,12 +30,36 @@ MAX_REVIEWS_PER_PLACE = 8
 # close to zero.
 REVIEWS_CACHE_TTL_SEC = 60 * 60 * 12
 
+# An empty result is usually a transient miss — a SerpApi blip, an unknown
+# spelling — not a place that will never have reviews. Holding a failure for
+# twelve hours is how one bad minute becomes "no reviews" all afternoon, so
+# empties are retried much sooner.
+NEGATIVE_CACHE_TTL_SEC = 60 * 10
+
 _cache_lock = threading.Lock()
 _cache: Dict[str, Dict[str, Any]] = {}
+
+# "Google has no reviews for this place" and "SerpApi did not answer" both
+# arrive as an empty list; the flag keeps them apart so an outage is never
+# shown to a visitor as an invitation to write the first review of a
+# well-reviewed city.
+_failed_lock = threading.Lock()
+_failed: Dict[str, bool] = {}
 
 
 def _cache_key(destination: str) -> str:
     return " ".join(destination.lower().split())
+
+
+def _mark_failed(destination: str, failed: bool) -> None:
+    with _failed_lock:
+        _failed[_cache_key(destination)] = failed
+
+
+def last_fetch_failed(destination: str) -> bool:
+    """True when the most recent lookup for this destination errored."""
+    with _failed_lock:
+        return _failed.get(_cache_key(destination), False)
 
 
 def _cached(destination: str) -> Optional[List[Dict[str, Any]]]:
@@ -43,7 +67,8 @@ def _cached(destination: str) -> Optional[List[Dict[str, Any]]]:
         entry = _cache.get(_cache_key(destination))
     if not entry:
         return None
-    if time.time() - entry["timestamp"] > REVIEWS_CACHE_TTL_SEC:
+    ttl = REVIEWS_CACHE_TTL_SEC if entry["value"] else NEGATIVE_CACHE_TTL_SEC
+    if time.time() - entry["timestamp"] > ttl:
         return None
     return entry["value"]
 
@@ -57,6 +82,8 @@ def reset_review_cache() -> None:
     """Forget every cached review. For tests."""
     with _cache_lock:
         _cache.clear()
+    with _failed_lock:
+        _failed.clear()
 
 
 def _coerce_rating(value: Any) -> Optional[float]:
@@ -94,6 +121,8 @@ def _normalise_review(raw: Any, place: Dict[str, Any]) -> Optional[Dict[str, Any
         "totalReviews": _positive_int(place.get("reviews")),
         "averageRating": _coerce_rating(place.get("rating")),
         "placeName": str(place.get("title") or "").strip()[:200],
+        "source": "google",
+        "url": None,
     }
 
 
@@ -161,6 +190,7 @@ class GoogleReviewsProvider(BaseLiveDataProvider):
         api_key = (settings.SERPAPI_API_KEY or "").strip()
         if not api_key:
             print("[Reviews] SERPAPI_API_KEY is not set; skipping Google reviews.")
+            _mark_failed(destination, True)
             return []
 
         payload = fetch_with_retry(
@@ -176,15 +206,18 @@ class GoogleReviewsProvider(BaseLiveDataProvider):
         )
         if not isinstance(payload, dict):
             print(f"[Reviews] SerpApi returned no usable payload for {destination!r}.")
+            _mark_failed(destination, True)
             return []
 
-        if payload.get("error"):
+        payload_failed = bool(payload.get("error"))
+        if payload_failed:
             # SerpApi reports its own failures in-band with HTTP 200, so this is
             # the only way to see an exhausted quota or a bad key.
             print(f"[Reviews] SerpApi error for {destination!r}: {payload['error']}")
 
         place = _pick_place(payload, destination)
         reviews: List[Dict[str, Any]] = []
+        reviews_fetch_failed = False
         if place:
             # Fetch actual review text from google_maps_reviews if IDs exist
             data_id = place.get("data_id")
@@ -205,6 +238,9 @@ class GoogleReviewsProvider(BaseLiveDataProvider):
                     reviews_payload = fetch_with_retry(SERPAPI_ENDPOINT, params=params)
                 except Exception:
                     reviews_payload = None
+                reviews_fetch_failed = not (
+                    isinstance(reviews_payload, dict) and not reviews_payload.get("error")
+                )
 
             raw_reviews: Any = None
             if isinstance(reviews_payload, dict):
@@ -221,6 +257,14 @@ class GoogleReviewsProvider(BaseLiveDataProvider):
                     normalised = _normalise_review(raw, place)
                     if normalised:
                         reviews.append(normalised)
+
+        # An outage is not an empty place: flag it for the endpoint and skip
+        # the cache, so the next visitor's request tries again instead of
+        # being told nobody has reviewed this destination.
+        failed = payload_failed or (reviews_fetch_failed and not reviews)
+        _mark_failed(destination, failed)
+        if failed and not reviews:
+            return []
 
         _store(destination, reviews)
         return reviews

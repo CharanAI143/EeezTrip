@@ -50,8 +50,16 @@ export default function AuthPage() {
   // In an effect rather than during render, because navigating is a store
   // dispatch and dispatching mid-render re-enters this component.
   useEffect(() => {
-    if (state.user) navigate('landing');
-  }, [state.user, navigate]);
+    if (state.user) navigate(state.pendingReviewDestination ? 'reviews' : 'landing');
+  }, [state.user, navigate, state.pendingReviewDestination]);
+
+  /**
+   * Where sign-in lands. A visitor who came here to review a place with no
+   * reviews yet ("give review later") returns to the Reviews page with the
+   * destination still pending, so the form opens prefilled; everyone else
+   * goes home.
+   */
+  const postAuthPage = () => (state.pendingReviewDestination ? 'reviews' as const : 'landing' as const);
 
   const unavailable = !isFirebaseConfigured;
 
@@ -70,7 +78,7 @@ export default function AuthPage() {
     setNotice(null);
     try {
       await signInWithPopup(auth, p);
-      navigate('landing');
+      navigate(postAuthPage());
     } catch (e) {
       setError(authErrorMessage(e));
     } finally {
@@ -98,7 +106,7 @@ export default function AuthPage() {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      navigate('landing');
+      navigate(postAuthPage());
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {

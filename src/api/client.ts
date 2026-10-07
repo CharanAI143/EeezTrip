@@ -1,4 +1,4 @@
-import { PlaceImage, Recommendation, TripPreferences, ExternalReview } from '../types';
+import { PlaceImage, Recommendation, TripPreferences, ExternalReview, ExternalReviewsBundle } from '../types';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -292,21 +292,54 @@ export async function fetchWeatherAlternatives(
 }
 
 /**
- * Google reviews for a destination, via the backend's SerpApi aggregation.
+ * All third-party reviews for a destination — Google, Tripadvisor, MakeMyTrip,
+ * Booking.com — bucketed by source, via the backend's SerpApi aggregation.
  *
- * Returns an empty list on any failure rather than throwing: this is the
+ * Returns an empty bundle on any failure rather than throwing: this is the
  * signed-out visitor's view of a destination, and the page has to render with
  * first-party reviews either way.
  */
-export async function fetchExternalReviews(destination: string): Promise<ExternalReview[]> {
+const ALL_SOURCES: ExternalReviewsBundle['failed'] = ['google', 'tripadvisor', 'makemytrip', 'booking'];
+
+// On any failure every source counts as failed: "we could not reach the travel
+// sites" must never be rendered as "nobody has reviewed this place".
+const EMPTY_BUNDLE: ExternalReviewsBundle = {
+  destination: '',
+  reviews: [],
+  sources: {},
+  links: {},
+  count: 0,
+  failed: ALL_SOURCES,
+};
+
+export async function fetchExternalReviewsBundle(destination: string): Promise<ExternalReviewsBundle> {
   try {
     const res = await fetch(`${BASE}/reviews/external?destination=${encodeURIComponent(destination)}`);
-    if (!res.ok) return [];
+    if (!res.ok) return { ...EMPTY_BUNDLE, destination };
     const data = await res.json();
-    return Array.isArray(data.reviews) ? data.reviews : [];
+    return {
+      destination: typeof data.destination === 'string' ? data.destination : destination,
+      reviews: Array.isArray(data.reviews) ? data.reviews : [],
+      sources: data.sources && typeof data.sources === 'object' ? data.sources : {},
+      links: data.links && typeof data.links === 'object' ? data.links : {},
+      count: typeof data.count === 'number' ? data.count : (Array.isArray(data.reviews) ? data.reviews.length : 0),
+      failed: Array.isArray(data.failed) ? data.failed : [],
+    };
   } catch {
-    return [];
+    return { ...EMPTY_BUNDLE, destination };
   }
+}
+
+/**
+ * Flattened third-party reviews for a destination, across every source.
+ *
+ * Kept for callers that only need the list; use
+ * {@link fetchExternalReviewsBundle} when source grouping or outbound links
+ * matter.
+ */
+export async function fetchExternalReviews(destination: string): Promise<ExternalReview[]> {
+  const bundle = await fetchExternalReviewsBundle(destination);
+  return bundle.reviews;
 }
 
 export async function fetchTripsFromDB(userId: string = "all"): Promise<any[]> {

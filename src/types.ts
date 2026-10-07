@@ -100,23 +100,48 @@ export type DestinationReview = {
 };
 
 /**
- * A review aggregated from Google via the backend, shown to signed-out visitors.
+ * A review aggregated from a third-party source (Google, Tripadvisor,
+ * MakeMyTrip, Booking.com) via the backend, shown to signed-out visitors.
  *
  * Deliberately a different shape from `DestinationReview`: it is read-only,
  * carries no `userId`, and is attributed to a place rather than a person, so it
  * can never be mistaken for something a traveller wrote.
  */
+export type ExternalReviewSource = 'google' | 'tripadvisor' | 'makemytrip' | 'booking';
+
 export type ExternalReview = {
   author: string;
   rating: number | null;
   text: string;
-  /** When the reviewer visited, as reported by Google. Often relative, e.g. "2 years ago". */
+  /** When the reviewer visited, as reported by the source. Often relative, e.g. "2 years ago". */
   visitedAt?: string | null;
-  /** How many reviews the place has in total, when Google reports it. */
+  /** How many reviews the place has in total, when the source reports it. */
   totalReviews?: number | null;
-  /** Average rating across all of the place's Google reviews. */
+  /** Average rating across all of the place's reviews from this source. */
   averageRating?: number | null;
   placeName: string;
+  /** Which site this review came from. Absent on legacy responses. */
+  source?: ExternalReviewSource;
+  /** Deep link to the original review, when the source provides one. */
+  url?: string | null;
+};
+
+/**
+ * The full payload of `/api/reviews/external`: every source's reviews, the
+ * same reviews bucketed by source, and outbound links for "read more" affordances.
+ */
+export type ExternalReviewsBundle = {
+  destination: string;
+  reviews: ExternalReview[];
+  sources: Partial<Record<ExternalReviewSource, ExternalReview[]>>;
+  links: Partial<Record<ExternalReviewSource, string>>;
+  count: number;
+  /**
+   * Sources that errored instead of answering. Empty means every source was
+   * heard from, so a `count` of 0 really is "nobody has reviewed this place"
+   * — and inviting the visitor to write the first review is honest.
+   */
+  failed: ExternalReviewSource[];
 };
 
 export type TripRecord = {

@@ -212,6 +212,49 @@ describe('ReviewDestinations form validation', () => {
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith('Kyoto'));
   });
 
+  it('hands the fetched reviews upward so the page needs only one read', async () => {
+    // The page shows the same traveller list beside the third-party sources;
+    // a second Firestore query would be a second chance for the two lists to
+    // disagree.
+    const onReviewsLoaded = vi.fn();
+    render(
+      <ReviewDestinations user={null} onLogin={vi.fn()} onReviewsLoaded={onReviewsLoaded} />
+    );
+
+    await waitFor(() => expect(onReviewsLoaded).toHaveBeenCalledWith([]));
+  });
+
+  it('opens the form prefilled for a destination asked about earlier', async () => {
+    // The "review later" round trip: a visitor whose destination had no
+    // reviews signs in, comes back, and the form is waiting with that
+    // destination already in it.
+    const onOpened = vi.fn();
+    render(
+      <ReviewDestinations user={user} onLogin={vi.fn()} openFor="Goa" onOpened={onOpened} />
+    );
+
+    const destinationInput = await screen.findByPlaceholderText(/kyoto, japan/i);
+    expect(destinationInput).toHaveValue('Goa');
+    await waitFor(() => expect(onOpened).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not clobber a form the traveller already has open', async () => {
+    // A pending destination can land while a half-written review is on screen
+    // (two cards offering to write at once). Opening the form must not throw
+    // the traveller's text away.
+    const { rerender } = render(
+      <ReviewDestinations user={user} onLogin={vi.fn()} openFor={null} />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /write (a|the first) review/i }));
+    const destinationInput = screen.getByPlaceholderText(/kyoto, japan/i);
+    fireEvent.change(destinationInput, { target: { value: 'Kyoto' } });
+
+    rerender(<ReviewDestinations user={user} onLogin={vi.fn()} openFor="Goa" />);
+
+    expect(destinationInput).toHaveValue('Kyoto');
+  });
+
   it('surfaces a failed post instead of silently doing nothing', async () => {
     // The old catch let the rejection escape as an unhandled promise, so a failed
     // write looked exactly like a button that does nothing.
